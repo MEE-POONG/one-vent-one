@@ -6,7 +6,7 @@ import type { EventData, PageData } from "@/lib/client-types";
 import {
   Empty,
   ErrorNotice,
-  EventRow,
+  EventCard,
   Loading,
   PageHeading,
   Pagination,
@@ -54,7 +54,7 @@ export function EventList() {
         <>
           <div className="event-list">
             {resource.data.items.map((event) => (
-              <EventRow key={event.id} event={event} />
+              <EventCard key={event.id} event={event} />
             ))}
           </div>
           <Pagination {...resource.data} onChange={setPage} />

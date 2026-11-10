@@ -4,7 +4,6 @@ import Image from "next/image";
 import {
   AlertCircle,
   ArrowRight,
-  CalendarDays,
   LoaderCircle,
   MapPin,
   Ticket as TicketIcon,
@@ -169,49 +168,78 @@ export function Highlight({
     </div>
   );
 }
-export function EventRow({ event }: { event: EventData }) {
+export function EventCard({ event }: { event: EventData }) {
+  const startsAt = new Date(event.startsAt);
+  const day = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    timeZone: "Asia/Bangkok",
+  }).format(startsAt);
+  const month = new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    timeZone: "Asia/Bangkok",
+  }).format(startsAt);
+  const modes = [...new Set(event.zones?.map((zone) => zone.sellingMode))];
+  const detailsHref = `/events/${event.slug}`;
+  const isPublished = event.status === "PUBLISHED";
   return (
-    <Highlight className="event-row">
+    <article className="event-card">
       <Link
-        className="event-image"
-        href={`/events/${event.slug}`}
+        className="event-card-poster"
+        href={detailsHref}
         aria-label={`ดู ${event.title}`}
       >
         <Image
           src={event.posterUrl || "/concert-hero.png"}
           alt=""
-          width={300}
-          height={332}
-          sizes="(max-width: 520px) 90px, 150px"
+          fill
+          sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 384px"
           unoptimized={!!event.posterUrl?.startsWith("https:")}
         />
+        <time
+          className="event-card-date"
+          dateTime={event.startsAt}
+          aria-label={dateTime(event.startsAt)}
+        >
+          <strong>{day}</strong>
+          <span>{month}</span>
+        </time>
       </Link>
-      <div className="event-row-content">
-        <Status value={event.status} />
+      <div className="event-card-content">
+        {!isPublished ? <Status value={event.status} /> : null}
         <h3>
-          <Link href={`/events/${event.slug}`}>{event.title}</Link>
+          <Link href={detailsHref}>{event.title}</Link>
         </h3>
-        <p>
-          <CalendarDays size={16} />
-          {dateTime(event.startsAt)}
-        </p>
-        <p>
-          <MapPin size={16} />
+        <p className="event-card-venue">
+          <MapPin size={16} aria-hidden="true" />
           {event.venue}
         </p>
-      </div>
-      <div className="event-row-action">
-        {typeof event.minPriceSatang === "number" ? (
-          <div>
-            <span className="muted">เริ่มต้น</span>
-            <strong>{money(event.minPriceSatang)}</strong>
+        <div className="event-card-action">
+          <div className="event-card-price">
+            <span>เริ่มต้น</span>
+            <strong>
+              {typeof event.minPriceSatang === "number"
+                ? money(event.minPriceSatang)
+                : "รอประกาศราคา"}
+            </strong>
+          </div>
+          <Link
+            href={isPublished ? `${detailsHref}/booking` : detailsHref}
+            className="event-card-cta"
+            aria-label={`${isPublished ? "จองบัตร" : "ดูรายละเอียด"} ${event.title}`}
+          >
+            {isPublished ? "จองบัตร" : "รายละเอียด"}
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </div>
+        {modes.length ? (
+          <div className="event-card-tags" aria-label="รูปแบบบัตร">
+            {modes.map((mode) => (
+              <span key={mode}>#{modeText(mode)}</span>
+            ))}
           </div>
         ) : null}
-        <Link href={`/events/${event.slug}`} className="button button-outline">
-          รายละเอียด <ArrowRight size={18} />
-        </Link>
       </div>
-    </Highlight>
+    </article>
   );
 }
 export function Field({

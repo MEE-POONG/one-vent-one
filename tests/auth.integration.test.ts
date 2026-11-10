@@ -61,12 +61,19 @@ test(
         .map((value) => value.split(";")[0])
         .join("; ");
       assert.ok(cookie.includes("session_token"));
-      const sessionResponse = await fetch(`${baseURL}/api/auth/get-session`, {
-        headers: { Cookie: cookie },
-      });
-      const session = await sessionResponse.json();
-      assert.equal(session.user.id, user.id);
-      assert.deepEqual(session.user.roles, ["CUSTOMER"]);
+      const sessions = await Promise.all(
+        Array.from({ length: 8 }, () =>
+          fetch(`${baseURL}/api/auth/get-session`, {
+            headers: { Cookie: cookie },
+          }),
+        ),
+      );
+      for (const response of sessions) {
+        assert.equal(response.status, 200, "Concurrent session lookup failed");
+        const session = await response.json();
+        assert.equal(session.user.id, user.id);
+        assert.deepEqual(session.user.roles, ["CUSTOMER"]);
+      }
       const admin = await fetch(`${baseURL}/api/admin/events`, {
         headers: { Cookie: cookie },
       });

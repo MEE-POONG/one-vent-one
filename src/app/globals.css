@@ -390,9 +390,10 @@ small {
   font-size: 14px;
 }
 .event-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 28px;
 }
 .highlight {
   position: relative;
@@ -415,52 +416,153 @@ small {
 .highlight:hover:before {
   opacity: 1;
 }
-.event-row {
-  display: grid;
-  grid-template-columns: 150px 1fr auto;
-  gap: 26px;
-  align-items: center;
-  padding: 20px;
-  background: var(--surface);
-  border-radius: 12px;
-}
-.event-image {
-  width: 150px;
-  height: 166px;
+.event-card {
+  position: relative;
+  min-width: 0;
   overflow: hidden;
-  border-radius: 6px;
+  border: 1px solid #303035;
+  border-radius: 20px;
+  background: #111114;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.event-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.event-card:hover {
+  border-color: #704038;
+  box-shadow: 0 16px 40px #0004;
 }
-.event-row h3 {
-  margin: 10px 0 12px;
-  font-size: 25px;
-}
-.event-row-content p {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #c2c2cc;
-  font-size: 13px;
-  margin-top: 5px;
-}
-.event-row-action {
-  display: flex;
-  gap: 25px;
-  align-items: center;
-}
-.event-row-action > div {
-  min-width: 110px;
-}
-.event-row-action strong {
+.event-card-poster {
   display: block;
-  font-size: 26px;
+  position: relative;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background: #202026;
 }
-.event-row-action .muted {
+.event-card-poster img {
+  object-fit: cover;
+  transition: transform 0.4s;
+}
+.event-card:hover .event-card-poster img {
+  transform: scale(1.025);
+}
+.event-card-poster::after {
+  content: "";
+  position: absolute;
+  inset: 65% 0 0;
+  background: linear-gradient(transparent, #111114);
+  pointer-events: none;
+}
+.event-card-date {
+  position: absolute;
+  z-index: 1;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  min-height: 66px;
+  border: 1px solid #ffffff26;
+  border-radius: 12px;
+  background: #100b0cdd;
+  backdrop-filter: blur(10px);
+}
+.event-card-date strong {
+  font-size: 26px;
+  line-height: 1.15;
+}
+.event-card-date span {
+  margin-top: 4px;
   font-size: 12px;
+  color: #e4dfe0;
+}
+.event-card-content {
+  position: relative;
+  margin-top: -42px;
+  padding: 0 20px 20px;
+}
+.event-card h3 {
+  font-size: 21px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.event-card h3 a:hover {
+  color: #ff954a;
+}
+.event-card-venue {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 7px;
+  color: #d5d1d4;
+  font-size: 13px;
+}
+.event-card-venue svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #ff702e;
+}
+.event-card-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 22px;
+}
+.event-card-price span {
+  display: block;
+  color: #aaa4aa;
+  font-size: 12px;
+}
+.event-card-price strong {
+  display: block;
+  color: #ff792f;
+  font-size: 27px;
+  line-height: 1.4;
+}
+.event-card-cta {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: linear-gradient(100deg, #ff343d, #ff953e);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 24px #ff50252b;
+}
+.event-card-cta:hover {
+  background: linear-gradient(100deg, #e82a34, #ed7d27);
+}
+.event-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #ffffff12;
+}
+.event-card-tags span {
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #ffffff08;
+  color: #c4bec5;
+  font-size: 11px;
+}
+@media (max-width: 1000px) {
+  .event-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+}
+@media (max-width: 600px) {
+  .event-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
 }
 .steps-band {
   display: grid;
@@ -1353,11 +1455,6 @@ td small {
   }
 }
 @media (max-width: 1100px) {
-  .event-row-action {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
   .admin-shell {
     grid-template-columns: 190px minmax(0, 1fr);
   }
@@ -1411,33 +1508,6 @@ td small {
     font-size: 14px;
     max-width: 350px;
   }
-  .event-row {
-    grid-template-columns: 115px 1fr;
-    gap: 20px;
-  }
-  .event-image {
-    width: 115px;
-    height: 140px;
-    grid-row: 1/3;
-  }
-  .event-row-content h3 {
-    font-size: 21px;
-  }
-  .event-row-action {
-    grid-column: 2;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-  }
-  .event-row-action strong {
-    font-size: 21px;
-  }
-  .event-row-action .button {
-    font-size: 12px;
-    padding: 9px 13px;
-    min-height: 39px;
-  }
   .steps-band {
     gap: 20px;
   }
@@ -1456,7 +1526,7 @@ td small {
   .event-detail,
   .booking-workspace,
   .checkout-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sticky-panel {
     position: static;
@@ -1578,51 +1648,8 @@ td small {
     font-size: 12px;
     white-space: nowrap;
   }
-  .event-row {
-    grid-template-columns: 90px 1fr;
-    gap: 13px;
-    padding: 15px;
-    border-radius: 10px;
-  }
-  .event-image {
-    width: 90px;
-    height: 140px;
-  }
-  .event-row h3 {
-    font-size: 18px;
-    margin: 7px 0 9px;
-  }
-  .event-row-content p {
-    font-size: 11px;
-    gap: 5px;
-  }
-  .event-row-content p svg {
-    width: 12px;
-    flex-shrink: 0;
-  }
   .status {
     font-size: 11px;
-  }
-  .event-row-action {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .event-row-action > div {
-    min-width: 0;
-  }
-  .event-row-action strong {
-    font-size: 18px;
-  }
-  .event-row-action .muted {
-    font-size: 10px;
-  }
-  .event-row-action .button {
-    font-size: 11px;
-    min-height: 34px;
-    padding: 7px 10px;
-  }
-  .event-row-action .button svg {
-    width: 13px;
   }
   .steps-band {
     grid-template-columns: 1fr;

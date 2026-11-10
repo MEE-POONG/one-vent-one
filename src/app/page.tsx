@@ -8,7 +8,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { getBusinessProfile, listEvents } from "@/server/services/catalog";
-import { EventRow, Empty } from "@/components/ui";
+import { EventCard, Empty } from "@/components/ui";
 import type { EventData } from "@/lib/client-types";
 export const dynamic = "force-dynamic";
 export default async function HomePage() {
@@ -54,7 +54,7 @@ export default async function HomePage() {
         {events.length ? (
           <div className="event-list">
             {events.map((event) => (
-              <EventRow key={event.id} event={event} />
+              <EventCard key={event.id} event={event} />
             ))}
           </div>
         ) : (

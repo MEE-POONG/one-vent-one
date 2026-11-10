@@ -12,6 +12,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:events": "tsx prisma/seed-events.ts",
     "db:dev": "tsx scripts/dev-db.ts",
     "admin:create": "tsx scripts/bootstrap-admin.ts",
     "test": "node --conditions=react-server --import tsx --test tests/*.test.ts",
