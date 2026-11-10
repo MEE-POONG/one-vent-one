@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  SUPER_ADMIN
+  EVENT_MANAGER
+  PAYMENT_REVIEWER
+  CHECKIN_STAFF
+}
+enum SellingMode {
+  TABLE
+  SEAT
+  GENERAL_ADMISSION
+}
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  CANCELLED
+  COMPLETED
+}
+enum BookingStatus {
+  PENDING_PAYMENT
+  PENDING_REVIEW
+  ACTION_REQUIRED
+  CONFIRMED
+  EXPIRED
+  REJECTED
+  CANCELLED
+}
+enum UnitInventoryStatus {
+  AVAILABLE
+  HELD
+  REVIEW_RESERVED
+  SOLD
+  BLOCKED
+}
+enum AllocationStatus {
+  HELD
+  REVIEW_RESERVED
+  SOLD
+  RELEASED
+}
+enum PaymentAttemptStatus {
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+enum RefundStatus {
+  PENDING
+  REFUNDED
+  CANCELLED
+}
+enum TicketStatus {
+  ACTIVE
+  USED
+  REVOKED
+}
+
+model BusinessProfile {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  key                 String   @unique @default("primary")
+  displayName         String
+  logo                String?
+  theme               Json
+  contact             Json
+  paymentInstructions Json
+  bookingPolicy       Json
+  holdMinutes         Int      @default(15)
+  reviewHours         Int      @default(24)
+  correctionHours     Int      @default(24)
+  version             Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model User {
+  id               String                 @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  email            String                 @unique
+  emailVerified    Boolean                @default(false)
+  image            String?
+  roles            Role[]                 @default([CUSTOMER])
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  sessions         Session[]
+  accounts         Account[]
+  bookings         Booking[]
+  assignments      StaffEventAssignment[]
+  assets           MediaAsset[]
+  tickets          Ticket[]               @relation("TicketOwner")
+  usedTickets      Ticket[]               @relation("TicketStaff")
+  reviewedPayments PaymentAttempt[]
+  refunds          RefundRecord[]
+  audits           AuditLog[]
+  checkIns         CheckInLog[]
+  publishedLayouts LayoutVersion[]
+  idempotency      IdempotencyRecord[]
+}
+
+model Session {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  @@index([userId])
+}
+
+model Account {
+  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
+  accountId              String
+  providerId             String
+  userId                 String    @db.ObjectId
+  user                   User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accessToken            String?
+  refreshToken           String?
+  idToken                String?
+  accessTokenExpiresAt   DateTime?
+  refreshTokenExpiresAt  DateTime?
+  scope                  String?
+  password               String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([identifier])
+}
+
+model RateLimit {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  key         String @unique
+  count       Int
+  lastRequest Float
+}
+
+model ApiRateLimit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  count     Int      @default(0)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model Event {
+  id                       String                 @id @default(auto()) @map("_id") @db.ObjectId
+  slug                     String                 @unique
+  title                    String
+  description              String
+  artists                  String[]
+  venue                    String
+  posterUrl                String?
+  startsAt                 DateTime
+  endsAt                   DateTime
+  saleStartsAt             DateTime
+  saleEndsAt               DateTime
+  status                   EventStatus            @default(DRAFT)
+  publishedLayoutVersionId String?                @db.ObjectId
+  publishedLayoutVersion   LayoutVersion?         @relation("PublishedLayout", fields: [publishedLayoutVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  version                  Int                    @default(0)
+  cancellationReason       String?
+  cancellationProcessedAt  DateTime?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  layoutTemplate           LayoutTemplate?
+  layoutVersions           LayoutVersion[]        @relation("EventLayouts")
+  zones                    Zone[]
+  units                    BookableUnit[]
+  inventories              UnitInventory[]
+  ticketTypes              TicketType[]
+  pools                    CapacityPool[]
+  bookings                 Booking[]
+  tickets                  Ticket[]
+  assignments              StaffEventAssignment[]
+  checkIns                 CheckInLog[]
+  @@index([status, startsAt])
+}
+
+model StaffEventAssignment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  eventId   String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt DateTime @default(now())
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
+model LayoutTemplate {
+  id        String          @id @default(auto()) @map("_id") @db.ObjectId
+  eventId   String          @unique @db.ObjectId
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  name      String
+  width     Int             @default(1000)
+  height    Int             @default(700)
+  geometry  Json
+  revision  Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  versions  LayoutVersion[]
+}
+
+model LayoutVersion {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  eventId       String         @db.ObjectId
+  event         Event          @relation("EventLayouts", fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  templateId    String         @db.ObjectId
+  template      LayoutTemplate @relation(fields: [templateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  version       Int
+  width         Int
+  height        Int
+  geometry      Json
+  publishedById String?        @db.ObjectId
+  publishedBy   User?          @relation(fields: [publishedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  publishedAt   DateTime       @default(now())
+  activeEvents  Event[]        @relation("PublishedLayout")
+  bookings      Booking[]
+  @@unique([eventId, version])
+}
+
+model Zone {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  eventId     String         @db.ObjectId
+  event       Event          @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code        String
+  name        String
+  sellingMode SellingMode
+  capacity    Int            @default(0)
+  color       String         @default("#E11D48")
+  units       BookableUnit[]
+  ticketTypes TicketType[]
+  pools       CapacityPool[]
+  @@unique([eventId, code])
+}
+
+model BookableUnit {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  eventId         String          @db.ObjectId
+  event           Event           @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  zoneId          String          @db.ObjectId
+  zone            Zone            @relation(fields: [zoneId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code            String
+  name            String
+  sellingMode     SellingMode
+  parentTableId   String?         @db.ObjectId
+  parentTable     BookableUnit?   @relation("TableSeats", fields: [parentTableId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  seats           BookableUnit[]  @relation("TableSeats")
+  admissionCount  Int             @default(1)
+  priceSatang     Int
+  active          Boolean         @default(true)
+  metadata        Json?
+  inventory       UnitInventory[]
+  bookingItems    BookingItem[]
+  @@unique([eventId, code])
+  @@index([zoneId])
+}
+
+model UnitInventory {
+  id             String              @id @default(auto()) @map("_id") @db.ObjectId
+  eventId        String              @db.ObjectId
+  event          Event               @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unitId         String              @db.ObjectId
+  unit           BookableUnit        @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status         UnitInventoryStatus @default(AVAILABLE)
+  holdBookingId  String?             @db.ObjectId
+  holdBooking    Booking?            @relation(fields: [holdBookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  holdExpiresAt  DateTime?
+  version        Int                 @default(0)
+  @@unique([eventId, unitId])
+  @@index([holdBookingId])
+  @@index([eventId, status])
+}
+
+model CapacityPool {
+  id             String               @id @default(auto()) @map("_id") @db.ObjectId
+  eventId        String               @db.ObjectId
+  event          Event                @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  zoneId         String               @db.ObjectId
+  zone           Zone                 @relation(fields: [zoneId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code           String
+  capacity       Int
+  available      Int
+  held           Int                  @default(0)
+  reviewReserved Int                  @default(0)
+  sold           Int                  @default(0)
+  blocked        Int                  @default(0)
+  version        Int                  @default(0)
+  ticketTypes    TicketType[]
+  allocations    CapacityAllocation[]
+  bookingItems   BookingItem[]
+  @@unique([eventId, code])
+  @@index([zoneId])
+}
+
+model TicketType {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  eventId      String        @db.ObjectId
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  zoneId       String        @db.ObjectId
+  zone         Zone          @relation(fields: [zoneId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poolId       String        @db.ObjectId
+  pool         CapacityPool  @relation(fields: [poolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code         String
+  name         String
+  priceSatang  Int
+  saleStartsAt DateTime
+  saleEndsAt   DateTime
+  active       Boolean       @default(true)
+  bookingItems BookingItem[]
+  @@unique([eventId, code])
+  @@index([poolId])
+}
+
+model Booking {
+  id                    String          @id @default(auto()) @map("_id") @db.ObjectId
+  bookingNumber         String          @unique
+  userId                String          @db.ObjectId
+  user                  User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  eventId               String          @db.ObjectId
+  event                 Event           @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status                BookingStatus   @default(PENDING_PAYMENT)
+  totalSatang           Int
+  totalAdmissions       Int
+  holdExpiresAt         DateTime
+  reviewDueAt           DateTime?
+  correctionDueAt       DateTime?
+  layoutVersionId       String?         @db.ObjectId
+  layoutVersion         LayoutVersion?  @relation(fields: [layoutVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  snapshot              Json
+  version               Int             @default(0)
+  reason                String?
+  verifiedPaymentId     String?         @db.ObjectId
+  verifiedAmountSatang   Int             @default(0)
+  confirmedAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  items                 BookingItem[]
+  inventories           UnitInventory[]
+  payments              PaymentAttempt[]
+  refunds               RefundRecord[]
+  tickets               Ticket[]
+  assets                MediaAsset[]
+  @@index([userId, createdAt])
+  @@index([eventId, status])
+  @@index([status, holdExpiresAt])
+}
+
+model BookingItem {
+  id              String              @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId       String              @db.ObjectId
+  booking         Booking             @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sellingMode     SellingMode
+  unitId          String?             @db.ObjectId
+  unit            BookableUnit?       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ticketTypeId    String?             @db.ObjectId
+  ticketType      TicketType?         @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poolId          String?             @db.ObjectId
+  pool            CapacityPool?       @relation(fields: [poolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantity        Int
+  admissionCount  Int
+  unitPriceSatang Int
+  subtotalSatang  Int
+  snapshot        Json
+  allocation      CapacityAllocation?
+  tickets         Ticket[]
+  @@index([bookingId])
+  @@index([unitId])
+}
+
+model CapacityAllocation {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  bookingItemId String           @unique @db.ObjectId
+  bookingItem   BookingItem      @relation(fields: [bookingItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poolId        String           @db.ObjectId
+  pool          CapacityPool     @relation(fields: [poolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantity      Int
+  status        AllocationStatus @default(HELD)
+  version       Int              @default(0)
+  @@index([poolId, status])
+}
+
+model PaymentAttempt {
+  id                   String               @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId            String               @db.ObjectId
+  booking              Booking              @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assetId              String               @db.ObjectId
+  asset                MediaAsset           @relation("PaymentEvidence", fields: [assetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  declaredAmountSatang Int
+  transferTime         DateTime
+  submittedAt          DateTime             @default(now())
+  status               PaymentAttemptStatus @default(SUBMITTED)
+  reviewerId           String?              @db.ObjectId
+  reviewer             User?                @relation(fields: [reviewerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewedAt           DateTime?
+  reviewReason         String?
+  receivedAmountSatang Int                   @default(0)
+  duplicateEvidenceWarning Boolean          @default(false)
+  refunds              RefundRecord[]
+  @@index([bookingId, submittedAt])
+  @@index([status, submittedAt])
+}
+
+model RefundRecord {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId    String       @unique @db.ObjectId
+  booking      Booking      @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  paymentId    String       @db.ObjectId
+  payment      PaymentAttempt @relation(fields: [paymentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  amountSatang Int
+  reason       String
+  status       RefundStatus @default(PENDING)
+  operatorId   String?      @db.ObjectId
+  operator     User?        @relation(fields: [operatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proofAssetId String?      @db.ObjectId
+  proofAsset   MediaAsset?  @relation("RefundEvidence", fields: [proofAssetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  @@index([status, createdAt])
+}
+
+model Ticket {
+  id                String       @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId         String       @db.ObjectId
+  booking           Booking      @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookingItemId     String       @db.ObjectId
+  bookingItem       BookingItem  @relation(fields: [bookingItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  eventId           String       @db.ObjectId
+  event             Event        @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ownerId           String       @db.ObjectId
+  owner             User         @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  admissionSequence Int
+  tokenHash         String       @unique
+  encryptedToken    String
+  status            TicketStatus @default(ACTIVE)
+  usedAt            DateTime?
+  usedById          String?      @db.ObjectId
+  usedBy            User?        @relation("TicketStaff", fields: [usedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revokedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  checkIns          CheckInLog[]
+  @@unique([bookingItemId, admissionSequence])
+  @@index([bookingId])
+  @@index([eventId, status])
+}
+
+model CheckInLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId  String?  @db.ObjectId
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  eventId   String   @db.ObjectId
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actorId   String   @db.ObjectId
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  result    String
+  createdAt DateTime @default(now())
+  @@index([eventId, createdAt])
+}
+
+model MediaAsset {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  storageKey  String           @unique
+  mime        String
+  bytes       Int
+  ownerId     String           @db.ObjectId
+  owner       User             @relation(fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookingId   String?          @db.ObjectId
+  booking     Booking?         @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visibility  String           @default("PRIVATE")
+  uploadStatus String          @default("COMPLETE")
+  contentHash String
+  createdAt   DateTime         @default(now())
+  payments    PaymentAttempt[] @relation("PaymentEvidence")
+  refunds     RefundRecord[]   @relation("RefundEvidence")
+  @@index([ownerId, createdAt])
+  @@index([contentHash])
+}
+
+model AuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  actorId   String?  @db.ObjectId
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  action    String
+  entity    String
+  entityId  String
+  reason    String?
+  changes   Json?
+  createdAt DateTime @default(now())
+  @@index([entity, entityId, createdAt])
+  @@index([createdAt])
+}
+
+model IdempotencyRecord {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  actorId     String   @db.ObjectId
+  actor       User     @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  operation   String
+  key         String
+  requestHash String
+  state       String   @default("COMPLETED")
+  response    Json
+  statusCode  Int      @default(200)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@unique([actorId, operation, key])
+}

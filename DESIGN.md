@@ -1,0 +1,7 @@
+# OneVentOne visual system
+
+Direction: a contemporary concert programme, with a photographic public opening and quiet operational screens. The explicit user palette governs every surface. Concept reference: docs/design/home-concept.png. Asset: public/concert-hero.png (AI-created illustrative concert scene; not evidence of an actual show). Image generation introduced fictitious event content; this is intentionally replaced by actual database content in implementation.
+
+Background #0B0B0F; surfaces #18181B and #27272A; border #35353D; accent #E11D48; primary text #F4F4F5; secondary #D4D4D8. Thai sans text with clear 1.6 line-height, large carefully spaced public title, strong but compact operational headings. Native text controls over images, never text baked into images. Navigation is an open horizontal band; event lists are broad rows; administration uses a restrained sidebar plus open work area; editor uses a canvas with a separate properties panel. Inputs and buttons share 10px radii. Visible outlines, genuine empty/error/pending states, touch-friendly controls, reduced-motion override, and no color-only state.
+
+Motion is a single 2.6s red pulse used on a small live indicator; event-row pointer highlights use CSS variables and direct style updates, no React render on pointer movement. Mobile folds columns in task order. Data tables retain horizontal scrolling in a bounded region. QR credentials and payment evidence never use shared image caches.

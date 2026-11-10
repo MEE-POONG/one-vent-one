@@ -1,0 +1,109 @@
+# OneVentOne
+
+ระบบจัดการอีเวนท์หนึ่งธุรกิจต่อการติดตั้ง กรณีศึกษาร้านมงคลบาร์ สำหรับบริษัท มีพร้อม พัฒนาด้วย Next.js App Router + TypeScript + Prisma 6.19.3 + MongoDB replica set
+
+รองรับโต๊ะเหมา ที่นั่ง และบัตรยืนหลายราคาที่ใช้โควตาร่วม การพักสิทธิ์ 15 นาที ส่งหลักฐานโอนเงิน ตรวจเงินจริงโดยเจ้าหน้าที่ ออก QR หลังอนุมัติ เช็กอินครั้งเดียว และบันทึกการคืนเงินที่ดำเนินการภายนอกระบบ
+
+## เริ่มในเครื่อง Windows
+
+ต้องมี Node.js 24 และ npm อินเทอร์เน็ตจำเป็นครั้งแรกสำหรับดาวน์โหลด MongoDB binary และ dependencies
+
+```powershell
+cd E:\one-vent-one
+npm ci
+npm run setup:local
+npm run db:dev
+```
+
+เปิดอีก terminal โดยคงฐานข้อมูลที่ terminal แรกไว้:
+
+```powershell
+npm run db:validate
+npm run db:generate
+npm run db:push
+npm run db:seed
+npm run dev
+```
+
+เปิด [OneVentOne ในเครื่อง](http://127.0.0.1:3000) ใช้ host นี้ให้ตรงกับ `BETTER_AUTH_URL` ข้อมูล MongoDB เก็บถาวรใน `.local/mongodb` และหลักฐานใน `.local/uploads` คำสั่ง seed รันซ้ำโดยไม่รีเซ็ตราคา ผัง หรือการจองเดิม
+
+`setup:local` สร้าง `.env` และกุญแจสุ่มแยกกันครั้งแรกเท่านั้น ไม่พิมพ์กุญแจและไม่เขียนทับไฟล์เดิม ถ้ามี `.env` แล้วให้ตรวจค่าด้วยตัวเอง `.env` และ `.local` ถูกตัดออกจาก Git
+
+หาก npm แจ้งบล็อก install scripts: `prisma generate` และ `db:dev` จะทำขั้นตอนที่จำเป็นโดยตรง ตรวจ error จริงก่อนอนุญาตสคริปต์เพิ่มเติม ไม่ต้องอัปเกรด Prisma เป็น v7
+
+## สร้างผู้ดูแลครั้งแรก
+
+เลือกอีเมลสำหรับบัญชีพัฒนาและรหัสผ่านใหม่อย่างน้อย 12 ตัวอักษร ไม่ใช้บัญชีหรือรหัสผ่าน production คำสั่งนี้จะไม่เลื่อนสิทธิ์บัญชีลูกค้าที่สมัครไว้ก่อนแล้ว
+
+```powershell
+$env:BOOTSTRAP_ADMIN_EMAIL = Read-Host 'อีเมลผู้ดูแลสำหรับทดสอบ'
+$ovoPassword = Read-Host 'รหัสผ่านใหม่อย่างน้อย 12 ตัวอักษร' -AsSecureString
+$env:BOOTSTRAP_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new('', $ovoPassword).Password
+npm run admin:create
+Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD
+Remove-Item Env:BOOTSTRAP_ADMIN_EMAIL
+```
+
+เข้าสู่ระบบและเปิด `/admin` ลูกค้าสมัครได้ที่ `/register` เจ้าหน้าที่อื่นให้สมัครเป็นลูกค้าก่อน แล้วผู้ดูแลกำหนด roles และงานที่เช็กอินได้จากหน้าจัดการเจ้าหน้าที่
+
+## ทดลองงานตัวอย่าง
+
+1. หน้าอีเวนท์มี MONGKOL LIVE SESSION: 8 โต๊ะ (โต๊ะละ 4 สิทธิ์), 12 ที่นั่ง, บัตรยืน 80 สิทธิ์พร้อม Early Bird/Regular ที่ใช้ pool เดียวกัน
+2. สมัครลูกค้า → เลือกหน่วยขาย → ยืนยันจอง → ดูยอดและเวลาจริงจากเซิร์ฟเวอร์
+3. บัญชีธนาคาร seed เป็นข้อมูลสาธิต **ไม่ต้องโอนเงินจริง** อัปโหลดภาพทดสอบ PNG/JPEG/WebP ไม่เกิน 5 MB แล้วส่งข้อมูลการโอนสมมติ
+4. สถานะเปลี่ยนเป็นรอตรวจสอบและยังไม่มีบัตร ผู้ดูแลเข้า `/admin/bookings` เปิดรายการ ตรวจหลักฐาน แล้วกรอกผลตรวจยอดเต็มจำนวนเพื่อทดสอบการอนุมัติ
+5. กลับบัญชีลูกค้า เปิดบัตรจริงที่ระบบออก โต๊ะหนึ่งโต๊ะมี 4 QR แยกกัน
+6. ใช้บัญชีเจ้าหน้าที่ที่ได้รับสิทธิ์งาน เปิด `/admin/check-in` กรอกรหัสบัตรหรือสแกนด้วยกล้อง สแกนซ้ำไม่เพิ่มผู้เข้างาน
+7. ทดสอบยกเลิกโดยเจ้าหน้าที่: บัตรถูกเพิกถอนและมีรายการรอคืนเงิน หากบันทึกหลักฐานคืนเงินแล้วจึงเป็น REFUNDED ปุ่มเว็บไม่โอนเงิน
+
+## ผังและการเปิดขายงานใหม่
+
+สร้างงานแบบร่าง → สร้างโซน TABLE/SEAT/GENERAL_ADMISSION → เพิ่มหน่วยขายหรือประเภทบัตร → เปิด layout editor ผูกวัตถุเข้ากับหน่วยขาย → บันทึกและเผยแพร่ผัง → เปิดขายงาน
+
+ทุกหน่วย TABLE/SEAT ต้องอยู่ในผังก่อนเผยแพร่ ส่วน GA ใช้โซนและโควตาร่วม แก้ผังเป็นเวอร์ชันใหม่โดยไม่เปลี่ยนผังที่รายการจองเก่าอ้างอิง โครงสร้างหน่วยขายเพิ่มได้เฉพาะร่างงาน การเปลี่ยนราคาภายหลังไม่แก้ snapshot การจองเดิม
+
+การยกเลิกงานประมวลผลครั้งละ 25 การจองและรายงาน `remaining` ต้องดำเนินต่อจนเป็น 0 งานถูกปิดรับการจองตั้งแต่เริ่มยกเลิก
+
+## Atlas หรือ Docker
+
+ใช้ MongoDB Atlas replica set แล้วใส่ `DATABASE_URL` ของฐานข้อมูลพัฒนาแยกจาก production จำกัด IP และบัญชีตามสิทธิ์ที่จำเป็น จากนั้นใช้ validate/generate/db push/seed ตามข้างต้น
+
+Docker ทางเลือก: เปิด Docker Desktop แล้ว `docker compose up -d` จากนั้นเปลี่ยน URL เป็นค่าตาม `docker-compose.yml` และเริ่ม replica set ตาม healthcheck ของไฟล์ compose ห้ามเปิด `db:dev` และ Docker บนพอร์ตเดียวกัน
+
+## งานหมดเวลาและคิวตรวจ
+
+เรียก `POST /api/jobs/expire` จาก scheduler ทุกหนึ่งนาทีพร้อม `Authorization: Bearer <JOB_SECRET>` ไม่มี cookie endpoint ประมวลผลครั้งละ 100 รายการและตอบ `more` ให้เรียกต่อจน false รวมข้อมูลคิวตรวจเกินกำหนดด้วย การสร้าง/อ่านการจองตรวจหมดเวลาฝั่งเซิร์ฟเวอร์เพิ่มเติม ไม่อาศัย cron เพียงอย่างเดียว
+
+## ตรวจงาน
+
+```powershell
+npm run db:validate
+npm run db:generate
+npm run typecheck
+npm run lint
+npm run build
+npm test
+```
+
+บาง integration tests ต้องเปิดใช้ตามคำอธิบายในไฟล์ทดสอบและ `docs/ACCEPTANCE_REPORT.md` การทดสอบธุรกรรมเปิด replica set แยก ไม่แก้ข้อมูลพัฒนาหรือ production การทดสอบ HTTP ต้องมีเว็บและฐานข้อมูลพัฒนาทำงาน
+
+## โครงสร้าง
+
+| ตำแหน่ง               | หน้าที่                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `src/app`             | หน้าลูกค้า บัญชี หลังบ้าน และ Route Handlers `/api`         |
+| `src/server/services` | กฎการจอง inventory payment refund layout check-in และรายงาน |
+| `src/server/auth`     | Better Auth และโหลดสิทธิ์ปัจจุบัน                           |
+| `src/server/storage`  | หลักฐาน private แบบ persistent local volume                 |
+| `src/shared`          | Zod validation และ DTO ร่วม                                 |
+| `prisma`              | schema indexes และ seed                                     |
+| `tests`               | การตรวจ auth ธุรกรรม และผังกับฐานข้อมูลจริง                 |
+| `docs`                | ข้อกำหนด API พจนานุกรมข้อมูล และผลรับมอบ                    |
+
+รายละเอียด: [PROJECT_CONTRACT](docs/PROJECT_CONTRACT.md), [API_CONTRACT](docs/API_CONTRACT.md), [DATA_DICTIONARY](docs/DATA_DICTIONARY.md), [ACCEPTANCE_REPORT](docs/ACCEPTANCE_REPORT.md)
+
+## ข้อจำกัดการนำไปใช้จริง
+
+ยังไม่ได้ deploy หรือเชื่อมธนาคาร/mail service ไม่มีการกู้รหัสผ่านทางอีเมลจนกว่าจะตั้ง mail service จริง หลักฐานต้องอยู่บน private persistent volume; ไม่เหมาะกับ filesystem ชั่วคราวของ serverless ต้องเปลี่ยน storage adapter ก่อนใช้ลักษณะนั้น เก็บและสำรอง `TICKET_ENCRYPTION_KEY` อย่างปลอดภัย กุญแจหายจะเปิด QR เดิมไม่ได้
+
+ต้องตั้งค่าข้อมูลธุรกิจ บัญชีรับเงินจริง HTTPS การสำรองข้อมูล scheduler และ reverse proxy ให้ตรงสภาพแวดล้อมก่อนเปิดสาธารณะ ผลตรวจในเครื่องไม่ใช่ผลรับรอง production ดูรายการที่ผ่าน/ยังไม่ได้ตรวจในรายงานรับมอบ
