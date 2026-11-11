@@ -177,9 +177,11 @@ export function EventCard({ event }: { event: EventData }) {
   const month = new Intl.DateTimeFormat("en-GB", {
     month: "short",
     timeZone: "Asia/Bangkok",
-  }).format(startsAt);
+  })
+    .format(startsAt)
+    .toUpperCase();
   const modes = [...new Set(event.zones?.map((zone) => zone.sellingMode))];
-  const detailsHref = `/events/${event.slug}`;
+  const detailsHref = event.slug ? `/events/${event.slug}` : "/events";
   const isPublished = event.status === "PUBLISHED";
   return (
     <article className="event-card">
@@ -203,34 +205,22 @@ export function EventCard({ event }: { event: EventData }) {
           <strong>{day}</strong>
           <span>{month}</span>
         </time>
+        <span className={`event-card-badge ${isPublished ? "is-live" : ""}`}>
+          <span className="event-card-badge-dot" aria-hidden="true" />
+          {isPublished ? "เปิดขายบัตร" : statusText(event.status)}
+        </span>
       </Link>
       <div className="event-card-content">
-        {!isPublished ? <Status value={event.status} /> : null}
         <h3>
           <Link href={detailsHref}>{event.title}</Link>
         </h3>
         <p className="event-card-venue">
-          <MapPin size={16} aria-hidden="true" />
+          <MapPin size={15} aria-hidden="true" />
           {event.venue}
         </p>
-        <div className="event-card-action">
-          <div className="event-card-price">
-            <span>เริ่มต้น</span>
-            <strong>
-              {typeof event.minPriceSatang === "number"
-                ? money(event.minPriceSatang)
-                : "รอประกาศราคา"}
-            </strong>
-          </div>
-          <Link
-            href={isPublished ? `${detailsHref}/booking` : detailsHref}
-            className="event-card-cta"
-            aria-label={`${isPublished ? "จองบัตร" : "ดูรายละเอียด"} ${event.title}`}
-          >
-            {isPublished ? "จองบัตร" : "รายละเอียด"}
-            <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
+        {event.artists?.length ? (
+          <p className="event-card-artists">{event.artists.join(" · ")}</p>
+        ) : null}
         {modes.length ? (
           <div className="event-card-tags" aria-label="รูปแบบบัตร">
             {modes.map((mode) => (
@@ -238,6 +228,28 @@ export function EventCard({ event }: { event: EventData }) {
             ))}
           </div>
         ) : null}
+        <div className="event-card-action">
+          <div className="event-card-price">
+            <span>ราคาเริ่มต้น</span>
+            <strong>
+              {typeof event.minPriceSatang === "number"
+                ? money(event.minPriceSatang)
+                : "รอประกาศราคา"}
+            </strong>
+          </div>
+          <Link
+            href={
+              isPublished && event.slug
+                ? `${detailsHref}/booking`
+                : detailsHref
+            }
+            className="event-card-cta"
+            aria-label={`${isPublished ? "จองบัตร" : "ดูรายละเอียด"} ${event.title}`}
+          >
+            {isPublished ? "จองบัตร" : "รายละเอียด"}
+            <ArrowRight size={17} aria-hidden="true" />
+          </Link>
+        </div>
       </div>
     </article>
   );

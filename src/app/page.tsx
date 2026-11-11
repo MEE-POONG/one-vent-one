@@ -1,5 +1,5 @@
 import { getBusinessProfile, listEvents } from "@/server/services/catalog";
-import { MongkolHome } from "@/components/mongkol-home";
+import { Home } from "@/components/home";
 import type { EventData } from "@/lib/client-types";
 export const dynamic = "force-dynamic";
 export default async function HomePage() {
@@ -13,5 +13,5 @@ export default async function HomePage() {
     eventsResult.status === "fulfilled"
       ? JSON.parse(JSON.stringify(eventsResult.value.items))
       : [];
-  return <MongkolHome events={events} venueName={business?.displayName ?? "Mongkol Bar"} />;
+  return <Home events={events} venueName={business?.displayName ?? "Mongkol Bar"} />;
 }
