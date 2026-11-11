@@ -112,6 +112,27 @@ export const unitActivationInput = z.object({
   eventVersion: z.number().int().min(0),
   reason: z.string().trim().min(3).max(1000),
 });
+// Structure deletes are only allowed on drafts; the event version fences concurrent edits.
+export const structureDeleteInput = z.object({
+  eventVersion: z.number().int().min(0),
+});
+export const zoneEditInput = z.object({
+  name: z.string().trim().min(1).max(100),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i),
+  eventVersion: z.number().int().min(0),
+});
+export const ticketTypeEditInput = z
+  .object({
+    saleStartsAt: date,
+    saleEndsAt: date,
+    active: z.boolean(),
+    eventVersion: z.number().int().min(0),
+    reason: z.string().trim().min(3).max(1000),
+  })
+  .refine((v) => Date.parse(v.saleEndsAt) > Date.parse(v.saleStartsAt), {
+    message: "ช่วงเวลาขายไม่ถูกต้อง",
+    path: ["saleEndsAt"],
+  });
 
 export const geometryObject = z.object({
   id: z.string().min(1).max(80),

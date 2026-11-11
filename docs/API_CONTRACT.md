@@ -68,20 +68,29 @@ Upload decode/re-encode เป็น PNG เก็บนอก public directory 
 
 | Method และ suffix                             | Input                                                                     | data                                                                                      |
 | --------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| GET `/`                                       | q,page,pageSize                                                           | `{items,total,page,pageSize}`                                                             |
+| GET `/`                                       | q,status?,page,pageSize                                                   | `{items,total,page,pageSize}` แต่ละ item มี `_count.bookings`                             |
 | POST `/`                                      | EventFields                                                               | DRAFT Event + สร้างร่างผังว่าง                                                            |
 | GET `/:id`                                    | —                                                                         | Event พร้อม zones,pools,units.inventory,ticketTypes,layoutTemplate,publishedLayoutVersion |
+|                                               |                                                                           | + bookingCount,activeBookingCount,serverNow                                               |
 | PATCH `/:id`                                  | EventFields + version                                                     | Event; เก็บ snapshot การจองเดิม                                                           |
+| DELETE `/:id`                                 | `{version,reason}`                                                        | ลบถาวรเฉพาะ DRAFT/CLOSED/CANCELLED ที่ไม่มี Booking เลย พร้อมโครงสร้างและผังทั้งหมด       |
+| POST `/:id/duplicate`                         | EventFields (ของงานใหม่)                                                  | DRAFT ใหม่ คัดลอก zones,pools,units,ticketTypes,ร่างผัง (id ใหม่) ไม่คัดลอกการจอง         |
 | POST `/:id/publish`                           | `{version,reason}`                                                        | PUBLISHED; ต้องมีหน่วยขายและผังครอบคลุมทุกหน่วย                                           |
 | POST `/:id/close`                             | `{version,reason}`                                                        | CLOSED                                                                                    |
-| POST `/:id/complete`                          | `{version,reason}`                                                        | COMPLETED หลัง endsAt                                                                     |
+| POST `/:id/draft`                             | `{version,reason}`                                                        | CLOSED → DRAFT เมื่อไม่มี booking ที่ใช้งานอยู่ เพื่อแก้โครงสร้าง                         |
+| POST `/:id/complete`                          | `{version,reason}`                                                        | COMPLETED หลัง endsAt จาก PUBLISHED หรือ CLOSED                                           |
 | POST `/:id/cancel`                            | `{version,reason}`                                                        | `{eventId,status,processed,remaining,failedBookingIds,pendingRefundCount,complete}`       |
 | POST `/:id/zones`                             | `{code,name,sellingMode,capacity?,color?}`                                | Zone พร้อม pools; GA สร้าง pool ร่วมหนึ่งชุด                                              |
+| PATCH `/:id/zones/:zoneId`                    | `{eventVersion,name,color}`                                               | Zone; แก้ชื่อ/สีได้ทุกสถานะยกเว้น CANCELLED/COMPLETED                                     |
+| DELETE `/:id/zones/:zoneId`                   | `{eventVersion}`                                                          | DRAFT เท่านั้น; โซนต้องไม่มี unit/ticket type; ลบ pool และวัตถุผูกในร่างผัง               |
 | POST `/:id/units`                             | `{zoneId,code,name,sellingMode,admissionCount,priceSatang,parentUnitId?}` | Unit + UnitInventory                                                                      |
 | PATCH `/:id/units/:unitId`                    | `{version,status:AVAILABLE\|BLOCKED,reason}`                              | Inventory; ห้ามแตะหน่วยที่ถูกกันหรือขายแล้ว                                               |
 | PATCH `/:id/units/:unitId/price`              | `{eventVersion,name,priceSatang,reason}`                                  | ราคาใหม่; ไม่แก้ BookingItem เดิม                                                         |
+| DELETE `/:id/units/:unitId`                   | `{eventVersion}`                                                          | DRAFT เท่านั้น; ไม่มีประวัติจองและที่นั่งย่อย; ลบ inventory และวัตถุในร่างผัง             |
 | POST `/:id/ticket-types`                      | `{zoneId,poolId,code,name,priceSatang,saleStartsAt,saleEndsAt}`           | TicketType ใช้ pool ในโซนเดียวกัน                                                         |
 | PATCH `/:id/ticket-types/:ticketTypeId/price` | เหมือน unit price                                                         | ราคาใหม่                                                                                  |
+| PATCH `/:id/ticket-types/:ticketTypeId`       | `{eventVersion,saleStartsAt,saleEndsAt,active,reason}`                    | ปรับช่วงขาย/เปิด-ปิดประเภทบัตร มีผลกับการจองใหม่เท่านั้น                                  |
+| DELETE `/:id/ticket-types/:ticketTypeId`      | `{eventVersion}`                                                          | DRAFT เท่านั้น และไม่มีประวัติจอง                                                         |
 | PATCH `/:id/pools/:poolId`                    | `{version,capacity,reason}`                                               | Pool; ลดได้ไม่เกิน available ที่เหลือ                                                     |
 | GET `/:id/layout`                             | —                                                                         | Draft พร้อม `version` alias ของ revision                                                  |
 | PUT `/:id/layout`                             | `{version,width,height,geometry:{objects}}`                               | Draft revision เพิ่ม + warnings                                                           |
@@ -89,7 +98,7 @@ Upload decode/re-encode เป็น PNG เก็บนอก public directory 
 
 EventFields = slug,title,description,artists:string[],venue,posterUrl?,startsAt,endsAt,saleStartsAt,saleEndsAt วันสิ้นสุดต้องหลังวันเริ่มและช่วงขายสมเหตุสมผล slug lowercase a-z/0-9/hyphen; poster HTTPS หรือไฟล์ภายในเว็บ
 
-การเพิ่มโครงสร้าง zone/unit/type ทำได้เฉพาะ DRAFT หน่วยที่มีประวัติไม่ถูกลบหรือเปลี่ยนสิทธิ์ย้อนหลัง รุ่นแรกเลิกใช้งานผ่าน cancel/close/block เพื่อเก็บประวัติ ไม่ลบ Event/Booking ที่มีประวัติธุรกรรม
+การเพิ่มและลบโครงสร้าง zone/unit/type ทำได้เฉพาะ DRAFT การลบเป็น hard delete จึงทำได้เฉพาะรายการที่ไม่มีประวัติการจอง หน่วยที่มีประวัติไม่ถูกลบหรือเปลี่ยนสิทธิ์ย้อนหลัง ให้เลิกใช้งานผ่าน cancel/close/block/active=false เพื่อเก็บประวัติ ไม่ลบ Event/Booking ที่มีประวัติธุรกรรม slug และรหัส zone/unit/ticket type ที่ซ้ำได้ 409 `SLUG_TAKEN`/`CODE_TAKEN`
 
 Geometry object: `{id,code,name?,label?,type,shape,x,y,width,height,rotation,zoneId?,unitId?,color?}`; type=`zone|stage|entrance|aisle|service|label|table|seat`; shape=`rect|circle`; world coordinates แยก viewport; IDs คงเดิมเมื่อขยับ ตรวจ bounds รวม rotation, duplicates, unit/zone references, overlap warning; TABLE/SEAT ต้องผูกหน่วยจริง ส่วน geometry ไม่มี authoritative price/stock
 

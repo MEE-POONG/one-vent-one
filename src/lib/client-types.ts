@@ -107,6 +107,12 @@ export interface EventData {
   layout?: VenueLayout | null;
   publishedLayoutVersion?: VenueLayout | null;
   minPriceSatang?: number | null;
+  cancellationProcessedAt?: string | null;
+  // Admin-only counts.
+  bookingCount?: number;
+  activeBookingCount?: number;
+  serverNow?: string;
+  _count?: { bookings: number };
 }
 export interface Availability {
   eventId: string;

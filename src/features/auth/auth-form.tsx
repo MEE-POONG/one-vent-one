@@ -38,10 +38,14 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
               const next = new URLSearchParams(window.location.search).get(
                 "next",
               );
-              const destination = new URL(
-                next || "/account/bookings",
-                window.location.origin,
-              );
+              const roles =
+                (result.data?.user as { roles?: string[] } | undefined)
+                  ?.roles ?? [];
+              // Staff land on the back office; customers on their bookings.
+              const home = roles.some((r) => r !== "CUSTOMER")
+                ? "/admin"
+                : "/account/bookings";
+              const destination = new URL(next || home, window.location.origin);
               window.location.assign(
                 destination.origin === window.location.origin
                   ? destination.href

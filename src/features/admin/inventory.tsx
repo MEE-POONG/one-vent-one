@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useResource } from "@/lib/client-api";
 import type { EventData, Pool, Unit, Zone } from "@/lib/client-types";
 import {
+  dateTime,
   Empty,
   ErrorNotice,
   Field,
@@ -13,6 +14,8 @@ import {
   PageHeading,
   Status,
 } from "@/components/ui";
+const thaiInput = (value: string) =>
+  new Date(Date.parse(value) + 7 * 3600000).toISOString().slice(0, 16);
 type AdminEvent = Omit<EventData, "zones" | "units" | "pools"> & {
   zones: (Zone & { pools: Pool[] })[];
   units: (Omit<Unit, "inventory"> & {
@@ -25,18 +28,48 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
   const mutation = useMutation();
   const [notice, setNotice] = useState("");
   const [zone, setZone] = useState("");
+  const [editingType, setEditingType] = useState<string | null>(null);
   const event = resource.data;
+  const isDraft = event?.status === "DRAFT";
   async function submit(path: string, payload: unknown, method = "POST") {
     setNotice("");
     try {
-      await mutation.run(
+      const result = await mutation.run<{ layoutObjectsRemoved?: number }>(
         `/api/admin/events/${eventId}/${path}`,
         payload,
         method,
       );
       await resource.reload();
-      setNotice("บันทึกข้อมูลแล้ว");
-    } catch {}
+      setNotice(
+        method === "DELETE"
+          ? `ลบแล้ว${result?.layoutObjectsRemoved ? ` และนำวัตถุ ${result.layoutObjectsRemoved} ชิ้นออกจากผังร่าง (อย่าลืมเผยแพร่ผังใหม่)` : ""}`
+          : "บันทึกข้อมูลแล้ว",
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function remove(path: string, label: string) {
+    if (!event) return;
+    if (!window.confirm(`ลบ ${label} ถาวร?`)) return;
+    void submit(path, { eventVersion: event.version }, "DELETE");
+  }
+  function editZone(z: Zone) {
+    if (!event) return;
+    const name = window.prompt("ชื่อโซน", z.name);
+    if (name === null || !name.trim()) return;
+    const color = window.prompt("สีโซน (รูปแบบ #RRGGBB)", z.color);
+    if (color === null) return;
+    if (!/^#[0-9a-f]{6}$/i.test(color)) {
+      window.alert("สีต้องอยู่ในรูปแบบ #RRGGBB เช่น #E11D48");
+      return;
+    }
+    void submit(
+      `zones/${z.id}`,
+      { name: name.trim(), color, eventVersion: event.version },
+      "PATCH",
+    );
   }
   function editPrice(
     kind: "units" | "ticket-types",
@@ -100,10 +133,17 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
           </div>
           {event.status !== "DRAFT" ? (
             <div className="notice">
-              เพิ่มโซนและหน่วยขายได้เฉพาะอีเวนท์ฉบับร่าง
-              อีเวนท์นี้ยังปรับราคาและเปิดหรือปิดหน่วยที่ไม่มีผู้จองได้ตามสิทธิ์
+              เพิ่ม/ลบโซนและหน่วยขายได้เฉพาะอีเวนท์ฉบับร่าง
+              อีเวนท์นี้ยังปรับราคา ชื่อ/สีโซน ช่วงขายบัตร
+              และเปิดหรือปิดหน่วยที่ไม่มีผู้จองได้ หากต้องแก้โครงสร้าง
+              ให้ปิดการขายแล้วกด “กลับเป็นฉบับร่าง” ที่หน้ารายละเอียดงาน
             </div>
-          ) : null}
+          ) : (
+            <div className="notice">
+              ลบได้เฉพาะรายการที่ไม่มีประวัติการจอง
+              การลบโซนหรือหน่วยขายจะนำวัตถุที่ผูกไว้ออกจากผังร่างด้วย
+            </div>
+          )}
           <section className="panel">
             <h2>โซนในอีเวนท์</h2>
             {event.zones.length ? (
@@ -114,6 +154,7 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                       <th>รหัส / ชื่อ</th>
                       <th>รูปแบบ</th>
                       <th>ความจุร่วม</th>
+                      <th>จัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -121,6 +162,17 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                       <tr key={z.id}>
                         <td>
                           <strong>
+                            <span
+                              aria-hidden
+                              style={{
+                                display: "inline-block",
+                                width: 10,
+                                height: 10,
+                                borderRadius: 2,
+                                background: z.color,
+                                marginRight: 6,
+                              }}
+                            />
                             {z.code} · {z.name}
                           </strong>
                         </td>
@@ -129,6 +181,33 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                           {z.pools
                             ?.map((p) => `${p.name || p.code}: ${p.capacity}`)
                             .join(", ") || "ตามจำนวนหน่วยขาย"}
+                        </td>
+                        <td>
+                          <div className="table-actions">
+                            <button
+                              className="button button-outline button-small"
+                              disabled={
+                                mutation.pending ||
+                                ["CANCELLED", "COMPLETED"].includes(
+                                  event.status,
+                                )
+                              }
+                              onClick={() => editZone(z)}
+                            >
+                              แก้ไข
+                            </button>
+                            {isDraft ? (
+                              <button
+                                className="button button-danger button-small"
+                                disabled={mutation.pending}
+                                onClick={() =>
+                                  remove(`zones/${z.id}`, `โซน ${z.code}`)
+                                }
+                              >
+                                ลบ
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -298,6 +377,21 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                             ) : (
                               <small>มีรายการจอง</small>
                             )}
+                            {isDraft ? (
+                              <button
+                                className="button button-danger button-small"
+                                style={{ marginLeft: 8 }}
+                                disabled={mutation.pending}
+                                onClick={() =>
+                                  remove(
+                                    `units/${unit.id}`,
+                                    `หน่วยขาย ${unit.code}`,
+                                  )
+                                }
+                              >
+                                ลบ
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       );
@@ -437,25 +531,137 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                 </button>
               </div>
             ))}
-            {event.ticketTypes?.map((t) => (
-              <div className="price-row" key={t.id}>
-                <div>
-                  <strong>{t.name}</strong>
-                  <small>{t.code}</small>
+            {event.ticketTypes?.map((t) => {
+              const locked = ["CANCELLED", "COMPLETED"].includes(event.status);
+              return (
+                <div key={t.id}>
+                  <div className="price-row">
+                    <div>
+                      <strong>
+                        {t.name} {t.active ? null : <Status value="CLOSED" />}
+                      </strong>
+                      <small>
+                        {t.code} · ขาย {dateTime(t.saleStartsAt)} –{" "}
+                        {dateTime(t.saleEndsAt)}
+                      </small>
+                    </div>
+                    <div className="table-actions">
+                      <button
+                        className="text-link"
+                        disabled={mutation.pending || locked}
+                        onClick={() => editPrice("ticket-types", t)}
+                        aria-label={`แก้ราคา ${t.name}`}
+                      >
+                        {money(t.priceSatang)}
+                      </button>
+                      <button
+                        className="button button-outline button-small"
+                        disabled={mutation.pending || locked}
+                        onClick={() =>
+                          setEditingType(editingType === t.id ? null : t.id)
+                        }
+                      >
+                        แก้ช่วงขาย
+                      </button>
+                      <button
+                        className="button button-subtle button-small"
+                        disabled={mutation.pending || locked}
+                        onClick={() => {
+                          const reason = window.prompt(
+                            t.active
+                              ? `เหตุผลที่ปิดขาย ${t.name}`
+                              : `เหตุผลที่เปิดขาย ${t.name} อีกครั้ง`,
+                          );
+                          if (reason)
+                            void submit(
+                              `ticket-types/${t.id}`,
+                              {
+                                saleStartsAt: t.saleStartsAt,
+                                saleEndsAt: t.saleEndsAt,
+                                active: !t.active,
+                                eventVersion: event.version,
+                                reason,
+                              },
+                              "PATCH",
+                            );
+                        }}
+                      >
+                        {t.active ? "ปิดขายประเภทนี้" : "เปิดขายอีกครั้ง"}
+                      </button>
+                      {isDraft ? (
+                        <button
+                          className="button button-danger button-small"
+                          disabled={mutation.pending}
+                          onClick={() =>
+                            remove(`ticket-types/${t.id}`, `บัตร ${t.name}`)
+                          }
+                        >
+                          ลบ
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {editingType === t.id ? (
+                    <form
+                      className="form-grid"
+                      style={{ margin: "12px 0 20px" }}
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        const ok = await submit(
+                          `ticket-types/${t.id}`,
+                          {
+                            saleStartsAt: new Date(
+                              `${f.get("saleStartsAt")}+07:00`,
+                            ).toISOString(),
+                            saleEndsAt: new Date(
+                              `${f.get("saleEndsAt")}+07:00`,
+                            ).toISOString(),
+                            active: t.active,
+                            eventVersion: event.version,
+                            reason: String(f.get("reason")),
+                          },
+                          "PATCH",
+                        );
+                        if (ok) setEditingType(null);
+                      }}
+                    >
+                      <Field label="เริ่มขาย (เวลาไทย)">
+                        <input
+                          name="saleStartsAt"
+                          type="datetime-local"
+                          required
+                          defaultValue={thaiInput(t.saleStartsAt)}
+                        />
+                      </Field>
+                      <Field label="สิ้นสุดขาย (เวลาไทย)">
+                        <input
+                          name="saleEndsAt"
+                          type="datetime-local"
+                          required
+                          defaultValue={thaiInput(t.saleEndsAt)}
+                        />
+                      </Field>
+                      <Field label="เหตุผล">
+                        <input name="reason" required minLength={3} />
+                      </Field>
+                      <div className="actions">
+                        <button className="button" disabled={mutation.pending}>
+                          บันทึกช่วงขาย
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-outline"
+                          onClick={() => setEditingType(null)}
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
-                <button
-                  className="text-link"
-                  disabled={
-                    mutation.pending ||
-                    ["CANCELLED", "COMPLETED"].includes(event.status)
-                  }
-                  onClick={() => editPrice("ticket-types", t)}
-                  aria-label={`แก้ราคา ${t.name}`}
-                >
-                  {money(t.priceSatang)}
-                </button>
-              </div>
-            ))}
+              );
+            })}
             <form
               style={{ marginTop: 24 }}
               onSubmit={async (e) => {

@@ -51,6 +51,17 @@ const actionNames: Record<string, string> = {
   TICKET_TYPE_CREATE: "สร้างประเภทบัตร",
   CAPACITY_UPDATE: "เปลี่ยนความจุ",
   INVENTORY_UPDATE: "เปลี่ยนสถานะหน่วยขาย",
+  EVENT_DRAFT: "กลับเป็นฉบับร่าง",
+  EVENT_DELETE: "ลบอีเวนท์",
+  EVENT_DUPLICATE: "ทำซ้ำอีเวนท์",
+  ZONE_UPDATE: "แก้ไขโซน",
+  ZONE_DELETE: "ลบโซน",
+  UNIT_DELETE: "ลบหน่วยขาย",
+  UNIT_ACTIVE_UPDATE: "เปลี่ยนการขายหน่วย",
+  TICKET_TYPE_UPDATE: "แก้ไขประเภทบัตร",
+  TICKET_TYPE_DELETE: "ลบประเภทบัตร",
+  CLI_PROMOTE_ADMIN: "เลื่อนเป็นผู้ดูแลผ่านคำสั่งเซิร์ฟเวอร์",
+  CLI_RESET_PASSWORD: "รีเซ็ตรหัสผ่านผ่านคำสั่งเซิร์ฟเวอร์",
 };
 
 export function AuditHistory() {

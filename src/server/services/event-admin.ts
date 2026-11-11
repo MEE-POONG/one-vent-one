@@ -30,6 +30,12 @@ export const audit = (
   tx.auditLog.create({
     data: { actorId, action, entity, entityId, reason, changes },
   });
+export const ACTIVE_BOOKING_STATUSES = [
+  "PENDING_PAYMENT",
+  "PENDING_REVIEW",
+  "ACTION_REQUIRED",
+  "CONFIRMED",
+] as const;
 export async function adminEvent(id: string) {
   const event = await prisma.event.findUnique({
     where: { id },
@@ -43,17 +49,65 @@ export async function adminEvent(id: string) {
     },
   });
   if (!event) throw new DomainError("NOT_FOUND", "ไม่พบงาน", 404);
-  return event;
+  // Counts let the admin UI show only the actions the server will accept
+  // (delete needs zero bookings, returning to draft needs zero active bookings).
+  const [bookingCount, activeBookingCount] = await Promise.all([
+    prisma.booking.count({ where: { eventId: id } }),
+    prisma.booking.count({
+      where: { eventId: id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+    }),
+  ]);
+  return {
+    ...event,
+    bookingCount,
+    activeBookingCount,
+    serverNow: new Date().toISOString(),
+  };
+}
+export async function assertSlugFree(
+  tx: Prisma.TransactionClient,
+  slug: string,
+  exceptEventId?: string,
+) {
+  const taken = await tx.event.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
+  // Checked explicitly: a raw P2002 is retried by transaction() and then reported
+  // as a concurrency conflict, which hides the real cause from the operator.
+  invariant(
+    !taken || taken.id === exceptEventId,
+    "SLUG_TAKEN",
+    "ชื่อในลิงก์ (slug) นี้ถูกใช้กับงานอื่นแล้ว",
+    409,
+  );
+}
+async function assertCodeFree(
+  tx: Prisma.TransactionClient,
+  kind: "zone" | "unit" | "ticketType",
+  eventId: string,
+  code: string,
+) {
+  const where = { eventId_code: { eventId, code } };
+  const taken =
+    kind === "zone"
+      ? await tx.zone.findUnique({ where, select: { id: true } })
+      : kind === "unit"
+        ? await tx.bookableUnit.findUnique({ where, select: { id: true } })
+        : await tx.ticketType.findUnique({ where, select: { id: true } });
+  invariant(!taken, "CODE_TAKEN", `รหัส ${code} ถูกใช้ในงานนี้แล้ว`, 409);
 }
 export async function listAdminEvents(
   page: number,
   pageSize: number,
   q = "",
   allowedEventIds?: string[],
+  status?: EventStatus,
 ) {
   const where: Prisma.EventWhereInput = {
     ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
     ...(allowedEventIds ? { id: { in: allowedEventIds } } : {}),
+    ...(status ? { status } : {}),
   };
   const [items, total] = await Promise.all([
     prisma.event.findMany({
@@ -67,7 +121,7 @@ export async function listAdminEvents(
   ]);
   return { items, total, page, pageSize };
 }
-function eventData(input: z.infer<typeof createEventInput>) {
+export function eventData(input: z.infer<typeof createEventInput>) {
   return {
     ...input,
     posterUrl: input.posterUrl || null,
@@ -84,6 +138,7 @@ export async function createEvent(
 ) {
   requireRoles(actor, "EVENT_MANAGER");
   return idempotent(actor.id, "event:create", key, input, async (tx) => {
+    await assertSlugFree(tx, input.slug);
     const event = await tx.event.create({ data: eventData(input) });
     await tx.layoutTemplate.create({
       data: {
@@ -113,6 +168,7 @@ export async function editEvent(
       "INVALID_TRANSITION",
       "ไม่สามารถแก้ไขงานในสถานะนี้",
     );
+    await assertSlugFree(tx, fields.slug, id);
     const count = await tx.event.updateMany({
       where: { id, version },
       data: { ...eventData(fields), version: { increment: 1 } },
@@ -149,16 +205,30 @@ export async function changeEventStatus(
       });
       invariant(event, "NOT_FOUND", "ไม่พบงาน", 404);
       const allowed: Partial<Record<EventStatus, EventStatus[]>> = {
+        DRAFT: ["CLOSED"],
         PUBLISHED: ["DRAFT", "CLOSED"],
         CLOSED: ["PUBLISHED"],
         CANCELLED: ["DRAFT", "PUBLISHED", "CLOSED"],
-        COMPLETED: ["CLOSED"],
+        COMPLETED: ["PUBLISHED", "CLOSED"],
       };
       invariant(
         allowed[status]?.includes(event.status),
         "INVALID_TRANSITION",
         "ไม่สามารถเปลี่ยนสถานะงานนี้",
       );
+      if (status === "DRAFT")
+        // Check-in only accepts PUBLISHED/CLOSED events, so a draft must not hold
+        // live bookings or issued tickets.
+        invariant(
+          (await tx.booking.count({
+            where: {
+              eventId: id,
+              status: { in: [...ACTIVE_BOOKING_STATUSES] },
+            },
+          })) === 0,
+          "INVALID_TRANSITION",
+          "ยังมีรายการจองที่ใช้งานอยู่ ไม่สามารถกลับเป็นฉบับร่าง",
+        );
       if (status === "PUBLISHED") {
         invariant(
           event.publishedLayoutVersionId,
@@ -265,6 +335,7 @@ export async function createZone(
     input,
     async (tx) => {
       await configurable(tx, eventId);
+      await assertCodeFree(tx, "zone", eventId, input.code);
       const zone = await tx.zone.create({
         data: { ...input, eventId, capacity: input.capacity ?? 0 },
       });
@@ -307,6 +378,7 @@ export async function createUnit(
     input,
     async (tx) => {
       await configurable(tx, eventId);
+      await assertCodeFree(tx, "unit", eventId, input.code);
       const zone = await tx.zone.findFirst({
         where: { id: input.zoneId, eventId, sellingMode: input.sellingMode },
       });
@@ -351,6 +423,7 @@ export async function createTicketType(
     input,
     async (tx) => {
       await configurable(tx, eventId);
+      await assertCodeFree(tx, "ticketType", eventId, input.code);
       const pool = await tx.capacityPool.findFirst({
         where: { id: input.poolId, eventId, zoneId: input.zoneId },
         include: { zone: true },

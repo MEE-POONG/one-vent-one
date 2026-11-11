@@ -14,7 +14,10 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:events": "tsx prisma/seed-events.ts",
     "db:dev": "tsx scripts/dev-db.ts",
-    "admin:create": "tsx scripts/bootstrap-admin.ts",
+    "admin:list": "tsx scripts/admin.ts list",
+    "admin:create": "tsx scripts/admin.ts create",
+    "admin:promote": "tsx scripts/admin.ts promote",
+    "admin:reset-password": "tsx scripts/admin.ts reset-password",
     "test": "node --conditions=react-server --import tsx --test tests/*.test.ts",
     "setup:local": "tsx scripts/setup-local.ts"
   },

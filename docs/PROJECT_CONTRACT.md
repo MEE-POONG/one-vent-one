@@ -34,7 +34,7 @@
 - ไม่ติดตั้ง mail service หรือ reset mail handler จึงยังไม่มี flow กู้รหัสผ่านที่ส่งอีเมลจริง
 - Better Auth ตรวจ origin/CSRF; API mutation เพิ่ม origin check; auth rate limiter เก็บใน MongoDB; operation rate limiter ใช้ ApiRateLimit ใน MongoDB
 - ไม่เชื่อ client IP headers โดยปริยาย หากอยู่หลัง proxy ต้องตั้ง `TRUSTED_CLIENT_IP_HEADER` ให้ตรง header ที่ proxy เขียนทับ และปิด direct ingress
-- สร้างผู้ดูแลเริ่มต้นด้วย `npm run admin:create` และ environment ชั่วคราวเท่านั้น คำสั่งปฏิเสธการเลื่อนสิทธิ์บัญชีสาธารณะที่มีอยู่แล้ว
+- สร้างผู้ดูแลเริ่มต้นด้วย `npm run admin:create` (ถามแบบโต้ตอบ หรือใช้ environment ชั่วคราว) คำสั่งนี้ปฏิเสธการเลื่อนสิทธิ์บัญชีสาธารณะที่มีอยู่แล้ว การเลื่อนสิทธิ์ทำได้เฉพาะคำสั่งแยก `npm run admin:promote -- <email>` ที่ผู้ดูแลเซิร์ฟเวอร์ยืนยันเอง และกู้รหัสผ่านด้วย `npm run admin:reset-password -- <email>` (ล้าง session ทั้งหมด) ทุกคำสั่งบันทึก AuditLog
 
 ## สิทธิ์
 
