@@ -38,12 +38,12 @@ export default async function RootLayout({
         </a>
         <SiteHeader />
         <main id="main-content">{children}</main>
-        <footer className="site-footer">
+        <footer className="site-footer" id="contact">
           <div>
             <Link className="brand" href="/">
-              OneVent<span>One</span>
+              MONGKOL<span>BAR</span>
             </Link>
-            <p>ทุกคืนพิเศษ เริ่มที่นี่</p>
+            <p>Every mood, all in one place</p>
           </div>
           {business ? (
             <div className="actions">
