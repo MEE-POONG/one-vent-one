@@ -15,6 +15,7 @@ import {
   Status,
 } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
+import { isStaff, rolesOf } from "@/lib/roles";
 export function AdminBookings({ payments = false }: { payments?: boolean }) {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(payments ? "PENDING_REVIEW" : "");
@@ -161,11 +162,7 @@ export function AdminBookingDetail({ id }: { id: string }) {
     return asset;
   }
   const { data: session } = authClient.useSession();
-  const roles =
-    (session?.user as { roles?: string[] } | undefined)?.roles || [];
-  const canReview = roles.some((r) =>
-    ["SUPER_ADMIN", "PAYMENT_REVIEWER"].includes(r),
-  );
+  const canReview = isStaff(rolesOf(session));
   const [reason, setReason] = useState("");
   const [received, setReceived] = useState("");
   const [selectedPayment, setSelectedPayment] = useState("");

@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useMutation, useResource } from "@/lib/client-api";
-import type { EventData, PageData } from "@/lib/client-types";
+import type { PageData } from "@/lib/client-types";
+import { authClient } from "@/lib/auth-client";
+import { type AccessLevel, accessLevelLabels } from "@/lib/roles";
 import {
   Empty,
   ErrorNotice,
@@ -11,44 +13,45 @@ import {
   Pagination,
 } from "@/components/ui";
 
-type Staff = {
+type StaffUser = {
   id: string;
   name: string;
   email: string;
   roles: string[];
-  assignedEventIds: string[];
+  role: AccessLevel;
 };
-const roles = [
-  ["CUSTOMER", "ลูกค้า"],
-  ["SUPER_ADMIN", "ผู้ดูแลสูงสุด"],
-  ["EVENT_MANAGER", "ผู้จัดการอีเวนท์"],
-  ["PAYMENT_REVIEWER", "ผู้ตรวจชำระเงิน"],
-  ["CHECKIN_STAFF", "เจ้าหน้าที่ตรวจบัตร"],
-] as const;
+const levels: { value: AccessLevel; description: string }[] = [
+  {
+    value: "CUSTOMER",
+    description: "จองตั๋วและดูการจองของตัวเองเท่านั้น เข้าหลังบ้านไม่ได้",
+  },
+  {
+    value: "ADMIN",
+    description:
+      "ดูแลงานประจำวัน: อีเวนท์และผัง รายการจอง ตรวจชำระเงิน คืนเงิน ตรวจบัตรเข้างาน และรายงาน",
+  },
+  {
+    value: "SUPER_ADMIN",
+    description:
+      "ทุกอย่างของแอดมิน และจัดการพนักงาน ตั้งค่าร้าน/บัญชีรับเงิน ดูประวัติการทำรายการ",
+  },
+];
 
 function StaffEditor({
   user,
+  isSelf,
   onSaved,
   close,
 }: {
-  user: Staff;
-  onSaved: () => Promise<void>;
+  user: StaffUser;
+  isSelf: boolean;
+  onSaved: (updated: StaffUser) => Promise<void>;
   close: () => void;
 }) {
-  const [selectedRoles, setSelectedRoles] = useState(user.roles);
-  const [assignments, setAssignments] = useState(user.assignedEventIds);
-  const [eventPage, setEventPage] = useState(1);
+  const [role, setRole] = useState<AccessLevel>(user.role);
   const [reason, setReason] = useState("");
   const [saved, setSaved] = useState(false);
-  const events = useResource<PageData<EventData>>(
-    `/api/admin/events?page=${eventPage}&pageSize=20`,
-  );
   const mutation = useMutation();
-  function toggle(values: string[], value: string, checked: boolean) {
-    return checked
-      ? [...new Set([...values, value])]
-      : values.filter((item) => item !== value);
-  }
   return (
     <form
       className="panel stack"
@@ -56,14 +59,14 @@ function StaffEditor({
         e.preventDefault();
         setSaved(false);
         try {
-          await mutation.run("/api/admin/staff", {
+          const updated = await mutation.run<StaffUser>("/api/admin/staff", {
             userId: user.id,
-            roles: selectedRoles,
-            assignedEventIds: assignments,
+            role,
             reason,
           });
           setSaved(true);
-          await onSaved();
+          setReason("");
+          await onSaved(updated);
         } catch {}
       }}
     >
@@ -76,55 +79,34 @@ function StaffEditor({
           ปิด
         </button>
       </div>
-      <fieldset className="stack-sm">
-        <legend>บทบาทของผู้ใช้</legend>
-        {roles.map(([value, label]) => (
-          <label className="check-label" key={value}>
+      <fieldset className="stack-sm" disabled={isSelf}>
+        <legend>ระดับสิทธิ์</legend>
+        {isSelf ? (
+          <p className="muted">
+            ลดสิทธิ์ผู้ดูแลสูงสุดของตัวเองไม่ได้
+            เพื่อไม่ให้ร้านไม่มีเจ้าของบัญชี
+          </p>
+        ) : null}
+        {levels.map((level) => (
+          <label className="check-label" key={level.value}>
             <input
-              type="checkbox"
-              checked={selectedRoles.includes(value)}
-              onChange={(e) => {
-                setSelectedRoles(
-                  toggle(selectedRoles, value, e.target.checked),
-                );
+              type="radio"
+              name="role"
+              value={level.value}
+              checked={role === level.value}
+              onChange={() => {
+                setRole(level.value);
                 setSaved(false);
               }}
             />
-            {label}
+            <span>
+              <strong>{accessLevelLabels[level.value]}</strong>
+              <small className="muted" style={{ display: "block" }}>
+                {level.description}
+              </small>
+            </span>
           </label>
         ))}
-      </fieldset>
-      <fieldset className="stack-sm">
-        <legend>อีเวนท์ที่อนุญาตให้ตรวจบัตร</legend>
-        <p className="muted">
-          เลือกอีเวนท์และบทบาทเจ้าหน้าที่ตรวจบัตรควบคู่กัน เลือกไว้{" "}
-          {assignments.length} งาน
-        </p>
-        <ErrorNotice error={events.error} retry={events.reload} />
-        {events.loading ? (
-          <Loading />
-        ) : events.data?.items.length ? (
-          <>
-            {events.data.items.map((event) => (
-              <label className="check-label" key={event.id}>
-                <input
-                  type="checkbox"
-                  checked={assignments.includes(event.id)}
-                  onChange={(e) => {
-                    setAssignments(
-                      toggle(assignments, event.id, e.target.checked),
-                    );
-                    setSaved(false);
-                  }}
-                />
-                {event.title}
-              </label>
-            ))}
-            <Pagination {...events.data} onChange={setEventPage} />
-          </>
-        ) : !events.error ? (
-          <Empty title="ยังไม่มีอีเวนท์" />
-        ) : null}
       </fieldset>
       <Field label="เหตุผลที่เปลี่ยนสิทธิ์">
         <textarea
@@ -132,23 +114,27 @@ function StaffEditor({
           minLength={3}
           maxLength={1000}
           value={reason}
+          disabled={isSelf}
           onChange={(e) => {
             setReason(e.target.value);
             setSaved(false);
           }}
-          placeholder="ระบุหน้าที่หรือเหตุผลเพื่อบันทึกประวัติ"
+          placeholder="เช่น พนักงานใหม่ดูแลหน้าเว็บ / พนักงานลาออก"
         />
       </Field>
       <ErrorNotice error={mutation.error} />
       {saved ? (
         <p role="status" className="notice">
-          บันทึกสิทธิ์แล้ว การเปลี่ยนแปลงมีผลกับคำขอถัดไปของบัญชีนี้
+          บันทึกสิทธิ์แล้ว มีผลทันทีกับคำขอถัดไปของบัญชีนี้
         </p>
       ) : null}
       <button
         className="button"
         disabled={
-          mutation.pending || !selectedRoles.length || reason.trim().length < 3
+          isSelf ||
+          mutation.pending ||
+          role === user.role ||
+          reason.trim().length < 3
         }
       >
         {mutation.pending ? "กำลังบันทึก" : "บันทึกสิทธิ์"}
@@ -160,15 +146,17 @@ function StaffEditor({
 export function StaffPermissions() {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Staff | null>(null);
-  const resource = useResource<PageData<Staff>>(
-    `/api/admin/staff?page=${page}&pageSize=15&q=${encodeURIComponent(query)}`,
+  const [staffOnly, setStaffOnly] = useState(false);
+  const [selected, setSelected] = useState<StaffUser | null>(null);
+  const { data: session } = authClient.useSession();
+  const resource = useResource<PageData<StaffUser>>(
+    `/api/admin/staff?page=${page}&pageSize=15&q=${encodeURIComponent(query)}${staffOnly ? "&staffOnly=1" : ""}`,
   );
   return (
     <>
       <PageHeading
-        title="ผู้ใช้และสิทธิ์เจ้าหน้าที่"
-        description="สมาชิกสมัครเป็นลูกค้าเท่านั้น ผู้ดูแลกำหนดหน้าที่และอีเวนท์ที่ตรวจบัตรได้จากหน้านี้"
+        title="พนักงานและสิทธิ์"
+        description="ทุกคนสมัครที่หน้าเว็บเป็นลูกค้าก่อน แล้วเจ้าของร้านเลือกระดับสิทธิ์ให้พนักงานจากหน้านี้"
       />
       <div className="filter-bar">
         <Field label="ค้นหาชื่อหรืออีเมล">
@@ -181,6 +169,17 @@ export function StaffPermissions() {
             placeholder="ชื่อหรืออีเมล"
           />
         </Field>
+        <label className="check-label">
+          <input
+            type="checkbox"
+            checked={staffOnly}
+            onChange={(e) => {
+              setStaffOnly(e.target.checked);
+              setPage(1);
+            }}
+          />
+          แสดงเฉพาะพนักงานและเจ้าของร้าน
+        </label>
       </div>
       <ErrorNotice error={resource.error} retry={resource.reload} />
       {resource.loading ? (
@@ -192,8 +191,7 @@ export function StaffPermissions() {
               <thead>
                 <tr>
                   <th>ผู้ใช้</th>
-                  <th>บทบาท</th>
-                  <th>งานที่ตรวจบัตรได้</th>
+                  <th>ระดับสิทธิ์</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
@@ -204,15 +202,7 @@ export function StaffPermissions() {
                       <strong>{user.name}</strong>
                       <small>{user.email}</small>
                     </td>
-                    <td>
-                      {user.roles
-                        .map(
-                          (role) =>
-                            roles.find((item) => item[0] === role)?.[1] ?? role,
-                        )
-                        .join(", ")}
-                    </td>
-                    <td>{user.assignedEventIds.length} งาน</td>
+                    <td>{accessLevelLabels[user.role]}</td>
                     <td>
                       <button
                         className="button button-outline button-small"
@@ -235,7 +225,11 @@ export function StaffPermissions() {
         <StaffEditor
           key={selected.id}
           user={selected}
-          onSaved={resource.reload}
+          isSelf={selected.id === session?.user.id}
+          onSaved={async (updated) => {
+            setSelected(updated);
+            await resource.reload();
+          }}
           close={() => setSelected(null)}
         />
       ) : null}

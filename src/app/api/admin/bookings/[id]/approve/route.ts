@@ -6,7 +6,7 @@ import { requireRoles } from "@/server/permissions";
 export const runtime = "nodejs";
 export const POST = api(async (request, context) => {
   const actor = await requireActor(request);
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return approveBooking(
     actor,
     objectIdSchema.parse((await context.params).id),

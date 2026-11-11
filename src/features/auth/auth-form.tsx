@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { isStaff, rolesOf } from "@/lib/roles";
 import { ErrorNotice, Field } from "@/components/ui";
 export function AuthForm({ signup = false }: { signup?: boolean }) {
   const [pending, setPending] = useState(false);
@@ -34,15 +35,17 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
                   })
                 : await authClient.signIn.email(credentials);
               if (result.error)
-                throw new Error(result.error.message || "เข้าสู่ระบบไม่สำเร็จ");
+                throw new Error(
+                  result.error.code === "INVALID_ORIGIN"
+                    ? `ที่อยู่เว็บ ${window.location.origin} ไม่ตรงกับ BETTER_AUTH_URL ที่ตั้งไว้ในไฟล์ .env กรุณาเปิดเว็บจากที่อยู่นั้น หรือเพิ่มใน TRUSTED_ORIGINS`
+                    : result.error.message || "เข้าสู่ระบบไม่สำเร็จ",
+                );
               const next = new URLSearchParams(window.location.search).get(
                 "next",
               );
-              const roles =
-                (result.data?.user as { roles?: string[] } | undefined)
-                  ?.roles ?? [];
-              // Staff land on the back office; customers on their bookings.
-              const home = roles.some((r) => r !== "CUSTOMER")
+              // Staff (owner and admins) land on the back office; customers on
+              // their bookings.
+              const home = isStaff(rolesOf(result.data))
                 ? "/admin"
                 : "/account/bookings";
               const destination = new URL(next || home, window.location.origin);

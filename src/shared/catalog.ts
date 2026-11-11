@@ -169,21 +169,12 @@ export const layoutInput = z.object({
   geometry: z.object({ objects: z.array(geometryObject).max(1000) }),
 });
 export type LayoutGeometry = z.infer<typeof layoutInput>["geometry"];
+// Each account has exactly one access level; the stored roles array is derived from it.
+export const accessLevels = ["CUSTOMER", "ADMIN", "SUPER_ADMIN"] as const;
+export type AccessLevel = (typeof accessLevels)[number];
 export const staffInput = z.object({
   userId: objectId,
-  roles: z
-    .array(
-      z.enum([
-        "CUSTOMER",
-        "SUPER_ADMIN",
-        "EVENT_MANAGER",
-        "PAYMENT_REVIEWER",
-        "CHECKIN_STAFF",
-      ]),
-    )
-    .min(1)
-    .max(5),
-  assignedEventIds: z.array(objectId).max(100),
+  role: z.enum(accessLevels),
   reason: z.string().trim().min(3).max(1000),
 });
 export const businessInput = z.object({

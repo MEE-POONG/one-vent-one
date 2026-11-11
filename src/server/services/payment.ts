@@ -123,7 +123,7 @@ export async function approveBooking(
   input: ApprovalInput,
   key: string,
 ) {
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `payment.approve:${id}`,
@@ -227,7 +227,7 @@ export async function requestCorrection(
   input: ActionInput,
   key: string,
 ) {
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `payment.correction:${id}`,
@@ -290,7 +290,7 @@ export async function recordLateReceipt(
   input: PaymentInput & ActionInput,
   key: string,
 ) {
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `payment.late-receipt:${id}`,

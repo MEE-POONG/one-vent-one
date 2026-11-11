@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
+import { trustedOrigins } from "@/server/origins";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000";
 const createAdapter = prismaAdapter(prisma, { provider: "mongodb" });
@@ -31,13 +32,15 @@ export const auth = betterAuth({
               attempt >= 5
             )
               throw error;
-            await setTimeout(20 * 2 ** attempt + Math.floor(Math.random() * 30));
+            await setTimeout(
+              20 * 2 ** attempt + Math.floor(Math.random() * 30),
+            );
           }
         }
       },
     };
   },
-  trustedOrigins: [baseURL],
+  trustedOrigins,
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 12,
@@ -79,7 +82,7 @@ export const auth = betterAuth({
   },
 });
 
-export type Actor = { id: string; roles: Role[]; assignedEventIds: string[] };
+export type Actor = { id: string; roles: Role[] };
 
 export async function requireActor(request?: Request): Promise<Actor> {
   const session = await auth.api.getSession({
@@ -94,16 +97,8 @@ export async function requireActor(request?: Request): Promise<Actor> {
   // Always load current permissions. A role removed by an administrator takes effect immediately.
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: {
-      id: true,
-      roles: true,
-      assignments: { select: { eventId: true } },
-    },
+    select: { id: true, roles: true },
   });
   if (!user) throw new DomainError("UNAUTHENTICATED", "ไม่พบบัญชีผู้ใช้", 401);
-  return {
-    id: user.id,
-    roles: user.roles,
-    assignedEventIds: user.assignments.map((a) => a.eventId),
-  };
+  return { id: user.id, roles: user.roles };
 }

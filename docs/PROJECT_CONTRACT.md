@@ -28,7 +28,7 @@
 ใช้ Better Auth email/password กับ Prisma adapter `provider: mongodb` โดยปิดการสร้าง ID ของ library (`advanced.database.generateId: false`) ให้ Prisma/MongoDB สร้าง ObjectId ใช้ User/Session/Account/Verification/RateLimit ตาม library รหัสผ่านเก็บใน `Account.password` ด้วยกลไก hash ของ Better Auth ไม่เก็บ plaintext และไม่มี custom password/session implementation
 
 - สมัครสาธารณะได้ `CUSTOMER` เท่านั้น: User.roles มี DB default และ additional field กำหนด `input: false`
-- session ใช้ cookie ของ Better Auth อายุ 7 วัน; ปิด cookie cache; server โหลด role/assignment ปัจจุบันจาก DB ทุกคำขอ
+- session ใช้ cookie ของ Better Auth อายุ 7 วัน; ปิด cookie cache; server โหลด role ปัจจุบันจาก DB ทุกคำขอ
 - auth endpoint `/api/auth/[...all]`; `POST /api/auth/sign-up/email`, `sign-in/email`, `sign-out`; `GET /api/auth/get-session`
 - รหัสผ่านขั้นต่ำ 12 ตัวอักษร สูงสุด 128 ตัวอักษร
 - ไม่ติดตั้ง mail service หรือ reset mail handler จึงยังไม่มี flow กู้รหัสผ่านที่ส่งอีเมลจริง
@@ -38,15 +38,15 @@
 
 ## สิทธิ์
 
-| Role             | สิทธิ์                                                                           |
-| ---------------- | -------------------------------------------------------------------------------- |
-| CUSTOMER         | จอง อ่านและยกเลิกรายการที่ยังไม่ส่งเงินของตน ส่งหลักฐาน และอ่านบัตร/หลักฐานของตน |
-| SUPER_ADMIN      | ทุกงาน ผู้ใช้ การตั้งค่าธุรกิจ และสิทธิ์เจ้าหน้าที่                              |
-| EVENT_MANAGER    | งาน โซน หน่วยขาย ราคา ผัง และข้อมูลการจอง/รายงานตามบทบาท                         |
-| PAYMENT_REVIEWER | หลักฐานรับเงิน ตรวจเงินจริง ขอแก้ไข ปฏิเสธ ยกเลิกและบันทึกคืนเงิน                |
-| CHECKIN_STAFF    | ตรวจบัตรเฉพาะ Event ที่มี StaffEventAssignment                                   |
+ระบบนี้ติดตั้งให้ร้านเดียว (ไม่ใช่ระบบกลางหลายร้าน) จึงมี 3 ระดับสิทธิ์
 
-ผู้ใช้มีหลาย Role ได้ การซ่อนเมนูเป็น UX เท่านั้น ทุก operation ตรวจ session/role/ownership ฝั่ง server ไม่มี client supplied userId/reviewerId ที่ถือเป็น authority
+| Role        | ผู้ใช้          | สิทธิ์                                                                                                             |
+| ----------- | --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| SUPER_ADMIN | เจ้าของร้าน     | ทุกอย่างของ ADMIN และจัดการพนักงาน/สิทธิ์ ตั้งค่าธุรกิจและบัญชีรับเงิน ดูประวัติการทำรายการ (AuditLog)             |
+| ADMIN       | พนักงานดูแลเว็บ | อีเวนท์ โซน หน่วยขาย ราคา ผัง รายการจอง ตรวจหลักฐานและเงินจริง ขอแก้ไข ปฏิเสธ ยกเลิก คืนเงิน ตรวจบัตรทุกงาน รายงาน |
+| CUSTOMER    | ลูกค้า          | จอง อ่านและยกเลิกรายการที่ยังไม่ส่งเงินของตน ส่งหลักฐาน และอ่านบัตร/หลักฐานของตน                                   |
+
+แต่ละบัญชีมีระดับเดียว เก็บเป็น roles `[CUSTOMER]`, `[CUSTOMER, ADMIN]` หรือ `[CUSTOMER, SUPER_ADMIN]` (CUSTOMER คงไว้ให้พนักงานจองได้) SUPER_ADMIN ผ่านทุกการตรวจของ ADMIN เจ้าของร้านลดสิทธิ์ตัวเองไม่ได้ ข้อมูลจากรุ่น 5 role ย้ายด้วย `npm run db:migrate-roles` (EVENT_MANAGER/PAYMENT_REVIEWER/CHECKIN_STAFF → ADMIN) การซ่อนเมนูเป็น UX เท่านั้น ทุก operation ตรวจ session/role/ownership ฝั่ง server ไม่มี client supplied userId/reviewerId ที่ถือเป็น authority
 
 ## Enums และสถานะ
 
@@ -89,7 +89,7 @@ PENDING_REVIEW/ACTION_REQUIRED ไม่หมดอายุด้วย hold t
 - สลิปเก็บ private ใน storage adapter นอก public root; ตรวจ content/MIME/size และเจ้าของก่อน finalize; PaymentAttempt ใหม่ทุกครั้ง ไม่เขียนทับหลักฐานเก่า
 - ยอดรับจริงใช้ PaymentAttempt ที่ VERIFIED/Booking.verifiedPaymentId และ verifiedAmountSatang ไม่บวกรวมสลิปที่ส่งซ้ำ ไม่ยืนยันเงินเข้าด้วยการ upload
 - Ticket หนึ่งใบต่อ admission unique(bookingItemId,admissionSequence) ใช้ random opaque 32-byte credential ไม่มี PII เก็บ SHA-256 สำหรับ lookup และ AES-256-GCM encrypted credential เพื่อแสดง QR ซ้ำให้เจ้าของ `TICKET_ENCRYPTION_KEY` แยกจาก auth secret ไม่ log credential
-- Check-in ตรวจ Event/assignment/Booking CONFIRMED/Ticket ACTIVE แล้ว atomic first-use มี CheckInLog; QR เก่าที่ REVOKED ใช้ไม่ได้
+- Check-in ตรวจสิทธิ์ ADMIN/Event/Booking CONFIRMED/Ticket ACTIVE แล้ว atomic first-use มี CheckInLog; QR เก่าที่ REVOKED ใช้ไม่ได้
 - ยกเลิกไม่เท่ากับคืนเงิน RefundRecord unique(bookingId) ติดตามคืนเต็มจำนวนหนึ่งครั้งตามเงินจริงที่ตรวจแล้ว REFUNDED ต้องมีหลักฐานการคืนเงินภายนอก เว็บไม่โอนเงินเอง
 - ไม่มี TTL บน booking/payment/refund/audit; cleanup ข้อมูลชั่วคราวต้องไม่เป็นกลไกปล่อย stock
 

@@ -7,7 +7,7 @@ import { objectId, editEventInput, versionInput } from "@/shared/catalog";
 export const runtime = "nodejs";
 export const GET = api(async (request, context) => {
   const actor = await requireActor(request);
-  requireRoles(actor, "EVENT_MANAGER", "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return adminEvent(objectId.parse((await context.params).id));
 });
 export const PATCH = api(async (request, context) =>

@@ -12,7 +12,7 @@ export async function cancelEventBatch(
   input: { version: number; reason: string },
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   let event = await prisma.event.findUnique({ where: { id: eventId } });
   invariant(event, "NOT_FOUND", "ไม่พบงาน", 404);
   if (event.status !== "CANCELLED")

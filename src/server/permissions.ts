@@ -3,6 +3,12 @@ import type { Actor } from "@/server/auth";
 import type { Role } from "@prisma/client";
 import { DomainError } from "./errors";
 
+// Three roles for a single shop:
+//   SUPER_ADMIN  shop owner: everything, plus staff, shop settings and audit log
+//   ADMIN        shop staff: events, bookings, payments, refunds, check-in, reports
+//   CUSTOMER     books tickets and sees only their own bookings
+// SUPER_ADMIN passes every check, so requireRoles(actor, "ADMIN") means "staff".
+
 export function hasRole(actor: Actor, ...roles: Role[]) {
   return (
     actor.roles.includes("SUPER_ADMIN") ||
@@ -12,16 +18,4 @@ export function hasRole(actor: Actor, ...roles: Role[]) {
 export function requireRoles(actor: Actor, ...roles: Role[]) {
   if (!hasRole(actor, ...roles))
     throw new DomainError("FORBIDDEN", "คุณไม่มีสิทธิ์ดำเนินการนี้", 403);
-}
-export function requireCheckInEvent(actor: Actor, eventId: string) {
-  if (actor.roles.includes("SUPER_ADMIN")) return;
-  if (
-    !actor.roles.includes("CHECKIN_STAFF") ||
-    !actor.assignedEventIds.includes(eventId)
-  )
-    throw new DomainError(
-      "FORBIDDEN",
-      "คุณไม่ได้รับสิทธิ์ตรวจบัตรสำหรับงานนี้",
-      403,
-    );
 }

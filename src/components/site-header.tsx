@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarDays, LogOut, MapPin, Menu, Search, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { isStaff, rolesOf } from "@/lib/roles";
 import type { EventData, PageData } from "@/lib/client-types";
 import { dateTime } from "@/components/ui";
 
@@ -20,7 +21,7 @@ export function SiteHeader() {
   const [results, setResults] = useState<EventData[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const roles = (session?.user as { roles?: string[] } | undefined)?.roles || [];
+  const roles = rolesOf(session);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -60,7 +61,7 @@ export function SiteHeader() {
         <Link href="/">หน้าแรก</Link>
         <Link href="/#events">อีเวนต์</Link>
         <Link href="/#contact">ติดต่อเรา</Link>
-        {roles.some((r) => r !== "CUSTOMER") ? <Link href="/admin">จัดการระบบ</Link> : null}
+        {isStaff(roles) ? <Link href="/admin">จัดการระบบ</Link> : null}
       </nav>
       <div className="header-actions">
         <button

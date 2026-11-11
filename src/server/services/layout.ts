@@ -152,7 +152,7 @@ export async function saveLayout(
   input: z.infer<typeof layoutInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `layout:save:${eventId}`,
@@ -203,7 +203,7 @@ export async function publishLayout(
   input: { version: number },
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `layout:publish:${eventId}`,

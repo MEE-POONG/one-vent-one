@@ -38,7 +38,7 @@ test(
         name: "Auth integration test",
         email,
         password,
-        roles: ["SUPER_ADMIN", "PAYMENT_REVIEWER"],
+        roles: ["SUPER_ADMIN", "ADMIN"],
       });
       assert.equal(
         signup.status,
@@ -80,7 +80,7 @@ test(
       assert.equal(admin.status, 403);
       await prisma.user.update({
         where: { id: user.id },
-        data: { roles: ["CUSTOMER", "EVENT_MANAGER"] },
+        data: { roles: ["CUSTOMER", "ADMIN"] },
       });
       const granted = await fetch(`${baseURL}/api/admin/events`, {
         headers: { Cookie: cookie },

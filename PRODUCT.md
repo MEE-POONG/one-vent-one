@@ -8,7 +8,7 @@ web
 User-specified Next.js App Router, TypeScript, Tailwind CSS, Prisma 6.19.3, MongoDB replica set, react-konva for layout editing.
 
 ## Users
-Customers booking a concert at one business; event managers, payment reviewers and assigned check-in staff; super administrators. Case-study seed business: ร้านมงคลบาร์.
+One installation per shop (not a multi-shop marketplace). Customers who book; ADMIN staff who run the website day to day (events, bookings, payment review, refunds, check-in, reports); the SUPER_ADMIN shop owner, who also manages staff, shop settings and the audit log. Case-study seed business: ร้านมงคลบาร์.
 
 ## Product Purpose
 OneVentOne manages events, whole tables, individual seats and general admission reservations, manual bank-transfer review, tickets and first-use check-in in one application.

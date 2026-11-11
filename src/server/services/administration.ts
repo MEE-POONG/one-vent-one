@@ -6,7 +6,8 @@ import { requireRoles } from "@/server/permissions";
 import { invariant } from "@/server/errors";
 import { idempotent } from "./idempotency";
 import { audit } from "./event-admin";
-import { businessInput, staffInput } from "@/shared/catalog";
+import type { Prisma, Role } from "@prisma/client";
+import { type AccessLevel, businessInput, staffInput } from "@/shared/catalog";
 
 export async function updateBusiness(
   actor: Actor,
@@ -38,32 +39,24 @@ export async function updateStaff(
 ) {
   requireRoles(actor, "SUPER_ADMIN");
   return idempotent(actor.id, "staff:update", key, input, async (tx) => {
+    // The acting owner always stays SUPER_ADMIN, so the shop can never be left
+    // without an owner account.
     invariant(
-      input.userId !== actor.id || input.roles.includes("SUPER_ADMIN"),
+      input.userId !== actor.id || input.role === "SUPER_ADMIN",
       "FORBIDDEN",
-      "ไม่สามารถถอนสิทธิ์ผู้ดูแลสูงสุดของตัวเอง",
+      "ไม่สามารถลดสิทธิ์ผู้ดูแลสูงสุดของตัวเอง",
       403,
     );
-    const eventIds = [...new Set(input.assignedEventIds)];
-    invariant(
-      (await tx.event.count({ where: { id: { in: eventIds } } })) ===
-        eventIds.length,
-      "VALIDATION_ERROR",
-      "มีรหัสงานที่ไม่ถูกต้อง",
-      422,
-    );
+    const before = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { roles: true },
+    });
+    invariant(before, "NOT_FOUND", "ไม่พบผู้ใช้", 404);
     const user = await tx.user.update({
       where: { id: input.userId },
-      data: { roles: [...new Set(input.roles)] },
+      data: { roles: rolesFor(input.role) },
       select: { id: true, name: true, email: true, roles: true },
     });
-    await tx.staffEventAssignment.deleteMany({
-      where: { userId: input.userId },
-    });
-    for (const eventId of eventIds)
-      await tx.staffEventAssignment.create({
-        data: { userId: input.userId, eventId },
-      });
     await audit(
       tx,
       actor.id,
@@ -71,41 +64,51 @@ export async function updateStaff(
       "User",
       input.userId,
       input.reason,
-      { roles: user.roles, assignedEventIds: eventIds },
+      { before: before.roles, after: user.roles },
     );
-    return { ...user, assignedEventIds: eventIds };
+    return { ...user, role: accessLevel(user.roles) };
   });
 }
-export async function listStaff(q: string, page: number, pageSize: number) {
-  const where = q
-    ? {
-        OR: [
-          { email: { contains: q, mode: "insensitive" as const } },
-          { name: { contains: q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+/** Stored roles for an access level. CUSTOMER is kept so staff can also book. */
+export function rolesFor(level: AccessLevel): Role[] {
+  return level === "CUSTOMER" ? ["CUSTOMER"] : ["CUSTOMER", level];
+}
+export function accessLevel(roles: Role[]): AccessLevel {
+  return roles.includes("SUPER_ADMIN")
+    ? "SUPER_ADMIN"
+    : roles.includes("ADMIN")
+      ? "ADMIN"
+      : "CUSTOMER";
+}
+export async function listStaff(
+  q: string,
+  page: number,
+  pageSize: number,
+  staffOnly = false,
+) {
+  const where: Prisma.UserWhereInput = {
+    ...(q
+      ? {
+          OR: [
+            { email: { contains: q, mode: "insensitive" } },
+            { name: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+    ...(staffOnly ? { roles: { hasSome: ["ADMIN", "SUPER_ADMIN"] } } : {}),
+  };
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        roles: true,
-        assignments: { select: { eventId: true } },
-      },
+      select: { id: true, name: true, email: true, roles: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.user.count({ where }),
   ]);
   return {
-    items: users.map(({ assignments, ...u }) => ({
-      ...u,
-      assignedEventIds: assignments.map((a) => a.eventId),
-    })),
+    items: users.map((u) => ({ ...u, role: accessLevel(u.roles) })),
     total,
     page,
     pageSize,

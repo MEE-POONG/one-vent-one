@@ -74,12 +74,10 @@ test(
     const admin: Actor = {
       id: adminUser.id,
       roles: adminUser.roles,
-      assignedEventIds: [],
     };
     const customer: Actor = {
       id: customerUser.id,
       roles: customerUser.roles,
-      assignedEventIds: [],
     };
     const now = Date.now();
     const input = createEventInput.parse({
@@ -98,12 +96,12 @@ test(
         code: "FORBIDDEN",
       });
       const event = await createEvent(admin, input, randomUUID());
-      const assignedEvents = await listAdminEvents(1, 1, "", [event.id]);
-      assert.equal(assignedEvents.total, 1);
-      assert.equal(assignedEvents.items[0].id, event.id);
-      const noAssignments = await listAdminEvents(1, 1, "", []);
-      assert.equal(noAssignments.total, 0);
-      assert.deepEqual(noAssignments.items, []);
+      const drafts = await listAdminEvents(1, 10, "", "DRAFT");
+      assert.equal(drafts.total, 1);
+      assert.equal(drafts.items[0].id, event.id);
+      const published = await listAdminEvents(1, 10, "", "PUBLISHED");
+      assert.equal(published.total, 0);
+      assert.deepEqual(published.items, []);
       const zone = await createZone(
         admin,
         event.id,

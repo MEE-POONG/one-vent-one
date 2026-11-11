@@ -62,6 +62,7 @@ const actionNames: Record<string, string> = {
   TICKET_TYPE_DELETE: "ลบประเภทบัตร",
   CLI_PROMOTE_ADMIN: "เลื่อนเป็นผู้ดูแลผ่านคำสั่งเซิร์ฟเวอร์",
   CLI_RESET_PASSWORD: "รีเซ็ตรหัสผ่านผ่านคำสั่งเซิร์ฟเวอร์",
+  ROLE_MIGRATION: "ย้ายสิทธิ์เป็นระบบ 3 ระดับ",
 };
 
 export function AuditHistory() {

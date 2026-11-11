@@ -3,15 +3,15 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { DomainError } from "./errors";
+import { isTrustedOrigin } from "./origins";
 
 export type RouteContext = { params: Promise<Record<string, string>> };
 
 export function assertOrigin(request: Request) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
   const origin = request.headers.get("origin");
-  const expected = new URL(process.env.BETTER_AUTH_URL || request.url).origin;
   if (
-    (origin && origin !== expected) ||
+    (origin && !isTrustedOrigin(origin)) ||
     (!origin && request.headers.has("cookie")) ||
     request.headers.get("sec-fetch-site") === "cross-site"
   ) {

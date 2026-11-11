@@ -142,16 +142,7 @@ function warnIfRemote() {
 
 async function list() {
   const users = await prisma.user.findMany({
-    where: {
-      roles: {
-        hasSome: [
-          "SUPER_ADMIN",
-          "EVENT_MANAGER",
-          "PAYMENT_REVIEWER",
-          "CHECKIN_STAFF",
-        ],
-      },
-    },
+    where: { roles: { hasSome: ["SUPER_ADMIN", "ADMIN"] } },
     select: { email: true, name: true, roles: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
@@ -237,11 +228,8 @@ async function promote() {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
-      data: {
-        roles: [
-          ...new Set([...user.roles, "CUSTOMER", "SUPER_ADMIN"] as const),
-        ],
-      },
+      // One access level per account (see rolesFor in administration.ts).
+      data: { roles: ["CUSTOMER", "SUPER_ADMIN"] },
     });
     await tx.auditLog.create({
       data: {

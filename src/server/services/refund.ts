@@ -12,7 +12,7 @@ export async function createRefund(
   input: ActionInput,
   key: string,
 ) {
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `refund.create:${bookingId}`,
@@ -66,7 +66,7 @@ export async function completeRefund(
   input: CompleteRefundInput,
   key: string,
 ) {
-  requireRoles(actor, "PAYMENT_REVIEWER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `refund.complete:${refundId}`,

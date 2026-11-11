@@ -68,23 +68,20 @@ test(
       data: {
         name: "Reviewer",
         email: `staff-${randomUUID()}@example.invalid`,
-        roles: ["PAYMENT_REVIEWER", "CHECKIN_STAFF"],
+        roles: ["CUSTOMER", "ADMIN"],
       },
     });
     const customer: Actor = {
       id: customerUser.id,
       roles: ["CUSTOMER"],
-      assignedEventIds: [],
     };
     const other: Actor = {
       id: otherUser.id,
       roles: ["CUSTOMER"],
-      assignedEventIds: [],
     };
     const staff: Actor = {
       id: staffUser.id,
-      roles: ["PAYMENT_REVIEWER", "CHECKIN_STAFF"],
-      assignedEventIds: [],
+      roles: ["CUSTOMER", "ADMIN"],
     };
     const key = () => randomUUID();
     const isError = (code: string) => (error: unknown) =>
@@ -555,9 +552,10 @@ test(
         );
         const response = await privateAsset(customer, asset.id);
         assert.match(response.headers.get("cache-control")!, /no-store/);
+        // Customers can never check tickets in, not even their own.
         await assert.rejects(
           checkIn(
-            staff,
+            customer,
             {
               eventId: f.event.id,
               token: randomBytes(32).toString("base64url"),
@@ -588,7 +586,7 @@ test(
           }),
           1,
         );
-        const gate = { ...staff, assignedEventIds: [f.event.id] };
+        const gate = staff;
         const results = await Promise.allSettled(
           Array.from({ length: 8 }, () =>
             checkIn(
@@ -842,7 +840,7 @@ test(
         );
         await assert.rejects(
           checkIn(
-            { ...staff, assignedEventIds: [f.event.id] },
+            staff,
             { eventId: f.event.id, token: tickets[0].token! },
             key(),
           ),

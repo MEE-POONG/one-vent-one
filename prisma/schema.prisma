@@ -7,12 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// One deployment serves one shop. SUPER_ADMIN is the owner, ADMIN is shop staff
+// who run the website day to day, CUSTOMER is everyone who books.
 enum Role {
   CUSTOMER
+  ADMIN
   SUPER_ADMIN
-  EVENT_MANAGER
-  PAYMENT_REVIEWER
-  CHECKIN_STAFF
 }
 enum SellingMode {
   TABLE
@@ -93,7 +93,6 @@ model User {
   sessions         Session[]
   accounts         Account[]
   bookings         Booking[]
-  assignments      StaffEventAssignment[]
   assets           MediaAsset[]
   tickets          Ticket[]               @relation("TicketOwner")
   usedTickets      Ticket[]               @relation("TicketStaff")
@@ -191,20 +190,8 @@ model Event {
   pools                    CapacityPool[]
   bookings                 Booking[]
   tickets                  Ticket[]
-  assignments              StaffEventAssignment[]
   checkIns                 CheckInLog[]
   @@index([status, startsAt])
-}
-
-model StaffEventAssignment {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  eventId   String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  createdAt DateTime @default(now())
-  @@unique([userId, eventId])
-  @@index([eventId])
 }
 
 model LayoutTemplate {

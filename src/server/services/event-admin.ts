@@ -101,12 +101,10 @@ export async function listAdminEvents(
   page: number,
   pageSize: number,
   q = "",
-  allowedEventIds?: string[],
   status?: EventStatus,
 ) {
   const where: Prisma.EventWhereInput = {
     ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
-    ...(allowedEventIds ? { id: { in: allowedEventIds } } : {}),
     ...(status ? { status } : {}),
   };
   const [items, total] = await Promise.all([
@@ -136,7 +134,7 @@ export async function createEvent(
   input: z.infer<typeof createEventInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, "event:create", key, input, async (tx) => {
     await assertSlugFree(tx, input.slug);
     const event = await tx.event.create({ data: eventData(input) });
@@ -159,7 +157,7 @@ export async function editEvent(
   input: z.infer<typeof editEventInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `event:edit:${id}`, key, input, async (tx) => {
     const { version, ...fields } = input;
     const event = await tx.event.findUnique({ where: { id } });
@@ -189,7 +187,7 @@ export async function changeEventStatus(
   input: { version: number; reason: string },
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `event:${status}:${id}`,
@@ -327,7 +325,7 @@ export async function createZone(
   input: z.infer<typeof zoneInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `zone:create:${eventId}`,
@@ -370,7 +368,7 @@ export async function createUnit(
   input: z.infer<typeof unitInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `unit:create:${eventId}`,
@@ -415,7 +413,7 @@ export async function createTicketType(
   input: z.infer<typeof ticketTypeInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `ticket-type:create:${eventId}`,
@@ -454,7 +452,7 @@ export async function setUnitInventory(
   input: z.infer<typeof inventoryInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `inventory:${unitId}`, key, input, async (tx) => {
     const result = await tx.unitInventory.updateMany({
       where: {
@@ -490,7 +488,7 @@ export async function setPoolCapacity(
   input: z.infer<typeof poolInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `pool:${poolId}`, key, input, async (tx) => {
     const pool = await tx.capacityPool.findFirst({
       where: { id: poolId, eventId },
@@ -540,7 +538,7 @@ export async function editPrice(
   input: z.infer<typeof priceEditInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `${kind}:price:${id}`, key, input, async (tx) => {
     const fenced = await tx.event.updateMany({
       where: {
@@ -591,7 +589,7 @@ export async function setUnitActive(
   input: z.infer<typeof unitActivationInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `unit:active:${unitId}`,

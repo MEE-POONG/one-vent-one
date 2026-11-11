@@ -7,8 +7,7 @@ export const runtime = "nodejs";
 export const GET = api(async (request) => {
   requireRoles(
     await requireActor(request),
-    "EVENT_MANAGER",
-    "PAYMENT_REVIEWER",
+    "ADMIN",
   );
   const eventId = new URL(request.url).searchParams.get("eventId");
   return getReports(eventId ? objectId.parse(eventId) : undefined);

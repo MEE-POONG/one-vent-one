@@ -7,10 +7,12 @@ export const runtime = "nodejs";
 export const GET = api(async (request) => {
   requireRoles(await requireActor(request), "SUPER_ADMIN");
   const { page, pageSize } = pagination(request);
+  const query = new URL(request.url).searchParams;
   return listStaff(
-    (new URL(request.url).searchParams.get("q") || "").slice(0, 160),
+    (query.get("q") || "").slice(0, 160),
     page,
     pageSize,
+    query.get("staffOnly") === "1",
   );
 });
 export const POST = api(async (request) =>

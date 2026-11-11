@@ -55,7 +55,7 @@ export async function ownedBooking(
   if (!booking) throw notFound();
   if (
     booking.userId !== actor.id &&
-    !(staffAllowed && hasRole(actor, "EVENT_MANAGER", "PAYMENT_REVIEWER"))
+    !(staffAllowed && hasRole(actor, "ADMIN"))
   )
     throw new DomainError("FORBIDDEN", "คุณไม่มีสิทธิ์เข้าถึงรายการนี้", 403);
   return booking;
@@ -383,7 +383,7 @@ export async function listBookings(
   admin = false,
   filters: { status?: BookingStatus; eventId?: string; q?: string } = {},
 ) {
-  if (admin) requireRoles(actor, "EVENT_MANAGER", "PAYMENT_REVIEWER");
+  if (admin) requireRoles(actor, "ADMIN");
   const where: Prisma.BookingWhereInput = {
     ...(admin ? {} : { userId: actor.id }),
     ...(filters.status && { status: filters.status }),
@@ -418,9 +418,9 @@ export async function cancelBooking(
   key: string,
   options: { eventCancellation?: boolean; reject?: boolean } = {},
 ) {
-  const staff = hasRole(actor, "PAYMENT_REVIEWER");
-  if (options.eventCancellation) requireRoles(actor, "EVENT_MANAGER");
-  if (options.reject) requireRoles(actor, "PAYMENT_REVIEWER");
+  const staff = hasRole(actor, "ADMIN");
+  if (options.eventCancellation) requireRoles(actor, "ADMIN");
+  if (options.reject) requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     options.reject ? `booking.reject:${id}` : `booking.cancel:${id}`,

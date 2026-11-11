@@ -100,7 +100,7 @@ export async function deleteEvent(
   input: z.infer<typeof versionInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `event:delete:${id}`, key, input, async (tx) => {
     const event = await tx.event.findUnique({ where: { id } });
     invariant(event, "NOT_FOUND", "ไม่พบงาน", 404);
@@ -133,7 +133,6 @@ export async function deleteEvent(
     await tx.zone.deleteMany({ where });
     await tx.layoutVersion.deleteMany({ where });
     await tx.layoutTemplate.deleteMany({ where });
-    await tx.staffEventAssignment.deleteMany({ where });
     await tx.checkInLog.deleteMany({ where });
     await tx.event.delete({ where: { id } });
     await audit(tx, actor.id, "EVENT_DELETE", "Event", id, input.reason, {
@@ -157,7 +156,7 @@ export async function duplicateEvent(
   input: z.infer<typeof createEventInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `event:duplicate:${sourceId}`,
@@ -291,7 +290,7 @@ export async function updateZone(
   input: z.infer<typeof zoneEditInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `zone:edit:${zoneId}`, key, input, async (tx) => {
     // Name and colour are display-only; booking snapshots keep their own copy.
     await fenceEvent(tx, eventId, input.eventVersion, EDITABLE);
@@ -315,7 +314,7 @@ export async function deleteZone(
   input: z.infer<typeof structureDeleteInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `zone:delete:${zoneId}`,
@@ -365,7 +364,7 @@ export async function deleteUnit(
   input: z.infer<typeof structureDeleteInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `unit:delete:${unitId}`,
@@ -414,7 +413,7 @@ export async function updateTicketType(
   input: z.infer<typeof ticketTypeEditInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `ticket-type:edit:${ticketTypeId}`,
@@ -458,7 +457,7 @@ export async function deleteTicketType(
   input: z.infer<typeof structureDeleteInput>,
   key: string,
 ) {
-  requireRoles(actor, "EVENT_MANAGER");
+  requireRoles(actor, "ADMIN");
   return idempotent(
     actor.id,
     `ticket-type:delete:${ticketTypeId}`,

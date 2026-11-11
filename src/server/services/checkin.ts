@@ -1,13 +1,14 @@
 import "server-only";
 import type { Actor } from "@/server/auth";
 import { DomainError, invariant } from "@/server/errors";
-import { requireCheckInEvent } from "@/server/permissions";
+import { requireRoles } from "@/server/permissions";
 import type { CheckInInput } from "@/shared/booking";
 import { idempotent } from "./idempotency";
 import { hashTicketToken } from "./ticket";
 
 export async function checkIn(actor: Actor, input: CheckInInput, key: string) {
-  requireCheckInEvent(actor, input.eventId);
+  // Any shop staff member may check tickets in at the door, for every event.
+  requireRoles(actor, "ADMIN");
   // Hash in the durable receipt, never save a QR credential in payload/logs.
   const tokenHash = hashTicketToken(input.token);
   const result = await idempotent(

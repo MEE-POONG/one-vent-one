@@ -37,7 +37,7 @@ export async function uploadEvidence(
   file: File,
   key: string,
 ) {
-  const staff = hasRole(actor, "PAYMENT_REVIEWER");
+  const staff = hasRole(actor, "ADMIN");
   const booking = await ownedBooking(prisma, actor, bookingId, staff);
   invariant(
     staff || ["PENDING_PAYMENT", "ACTION_REQUIRED"].includes(booking.status),
@@ -134,7 +134,7 @@ export async function uploadEvidence(
 export async function privateAsset(actor: Actor, id: string) {
   const asset = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!asset) throw notFound();
-  if (!hasRole(actor, "PAYMENT_REVIEWER")) {
+  if (!hasRole(actor, "ADMIN")) {
     // Access follows current booking ownership and staff permissions. A former
     // reviewer cannot keep access merely because they uploaded a refund receipt.
     const booking = asset.bookingId

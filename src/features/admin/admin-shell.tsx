@@ -14,67 +14,71 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Empty, Loading } from "@/components/ui";
+import { isStaff, rolesOf } from "@/lib/roles";
+// ADMIN runs daily operations; only the owner (SUPER_ADMIN) manages staff,
+// shop settings and the audit log. The server enforces the same split.
+const STAFF = ["SUPER_ADMIN", "ADMIN"];
+const OWNER = ["SUPER_ADMIN"];
 const nav = [
   {
     href: "/admin",
     label: "ภาพรวม",
     icon: LayoutDashboard,
-    roles: ["SUPER_ADMIN", "EVENT_MANAGER", "PAYMENT_REVIEWER"],
+    roles: STAFF,
   },
   {
     href: "/admin/events",
     label: "อีเวนท์และผัง",
     icon: CalendarDays,
-    roles: ["SUPER_ADMIN", "EVENT_MANAGER"],
+    roles: STAFF,
   },
   {
     href: "/admin/bookings",
     label: "รายการจอง",
     icon: ClipboardList,
-    roles: ["SUPER_ADMIN", "EVENT_MANAGER", "PAYMENT_REVIEWER"],
+    roles: STAFF,
   },
   {
     href: "/admin/payments",
     label: "ตรวจชำระเงิน",
     icon: CreditCard,
-    roles: ["SUPER_ADMIN", "PAYMENT_REVIEWER"],
+    roles: STAFF,
   },
   {
     href: "/admin/reports",
     label: "รายงาน",
     icon: ChartNoAxesCombined,
-    roles: ["SUPER_ADMIN", "EVENT_MANAGER", "PAYMENT_REVIEWER"],
+    roles: STAFF,
   },
   {
     href: "/admin/check-in",
     label: "ตรวจบัตรเข้างาน",
     icon: ScanLine,
-    roles: ["SUPER_ADMIN", "CHECKIN_STAFF"],
+    roles: STAFF,
   },
   {
     href: "/admin/staff",
     label: "เจ้าหน้าที่และสิทธิ์",
     icon: Users,
-    roles: ["SUPER_ADMIN"],
+    roles: OWNER,
   },
   {
     href: "/admin/settings",
     label: "ตั้งค่าร้าน",
     icon: Settings2,
-    roles: ["SUPER_ADMIN"],
+    roles: OWNER,
   },
   {
     href: "/admin/audit",
     label: "ประวัติการทำรายการ",
     icon: History,
-    roles: ["SUPER_ADMIN"],
+    roles: OWNER,
   },
 ];
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
-  const roles =
-    (session?.user as { roles?: string[] } | undefined)?.roles || [];
+  const roles = rolesOf(session);
   if (isPending) return <Loading />;
   if (!session)
     return (
@@ -89,7 +93,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </Empty>
       </div>
     );
-  if (!roles.some((r) => r !== "CUSTOMER"))
+  if (!isStaff(roles))
     return (
       <div className="container section">
         <Empty title="บัญชีนี้ไม่มีสิทธิ์จัดการระบบ">

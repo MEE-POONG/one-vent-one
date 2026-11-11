@@ -23,7 +23,7 @@
 | POST `/auth/sign-in/email` | email,password      | Better Auth session cookie                                   |
 | GET `/auth/get-session`    | —                   | session หรือ null                                            |
 | POST `/auth/sign-out`      | —                   | ยกเลิก session; client ล้างข้อมูลส่วนตัว                     |
-| GET `/me`                  | —                   | id,name,email,roles,assignedEventIds; ต้องเข้าสู่ระบบ        |
+| GET `/me`                  | —                   | id,name,email,roles; ต้องเข้าสู่ระบบ                         |
 
 ยังไม่มี mail reset API ของผลิตภัณฑ์ ไม่มีการแสดงข้อความส่งอีเมลสำเร็จโดยไม่มีบริการจริง
 
@@ -50,7 +50,7 @@ Event summary มี `minPriceSatang` หรือ null; availability unit ม�
 | POST `/bookings/:id/uploads`  | multipart `file` PNG/JPEG/WebP ≤5 MB                 | `{id,mime,bytes}` MediaAsset private; ไม่ใช่การรับชำระเงิน                                     |
 | POST `/bookings/:id/payments` | `{assetId,declaredAmountSatang,transferTime}`        | Booking PENDING_REVIEW; finalize ก่อน hold หมดอายุ ยกเว้นการแก้หลักฐานจาก ACTION_REQUIRED      |
 | GET `/bookings/:id/tickets`   | —                                                    | `{tickets,serverNow}`; owner เท่านั้น; ไม่มี tickets ก่อน CONFIRMED                            |
-| GET `/private-assets/:id`     | —                                                    | image/png binary, session+ownership หรือ PAYMENT_REVIEWER/SUPER_ADMIN                          |
+| GET `/private-assets/:id`     | —                                                    | image/png binary, session+ownership หรือ ADMIN/SUPER_ADMIN                                     |
 
 Booking detail มี id,bookingNumber,eventId,userId,status,totalSatang,totalAdmissions,holdExpiresAt,reviewDueAt,correctionDueAt,version,reason,items,payments,refunds,snapshot,event,serverNow
 
@@ -64,7 +64,7 @@ Upload decode/re-encode เป็น PNG เก็บนอก public directory 
 
 ## งาน โซน ราคา ผัง
 
-ทุก path ในตารางเริ่ม `/admin/events`; เขียนได้ EVENT_MANAGER/SUPER_ADMIN; อ่านรายการงานได้ PAYMENT_REVIEWER และ CHECKIN_STAFF ตาม scope
+ทุก path ในตารางเริ่ม `/admin/events`; อ่านและเขียนได้ ADMIN/SUPER_ADMIN
 
 | Method และ suffix                             | Input                                                                     | data                                                                                      |
 | --------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -106,7 +106,7 @@ Cancel event ปิดงานก่อนแล้วจัดการคร�
 
 ## ตรวจเงินและคืนเงิน
 
-ทุก action ต้อง PAYMENT_REVIEWER/SUPER_ADMIN; list/detail EVENT_MANAGER อ่านได้ตามสิทธิ์แต่เปิดสลิปไม่ได้
+ทุก action ต้อง ADMIN/SUPER_ADMIN
 
 | Method และ path                                       | Input                                                        | data                                                                                               |
 | ----------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
@@ -125,12 +125,12 @@ late receipt ใช้ declaredAmountSatang เป็นยอดที่เจ
 
 | Method และ path                 | Input                                                              | สิทธิ์ / data                                                         |
 | ------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| POST `/check-in`                | `{eventId,token}`                                                  | CHECKIN_STAFF ที่ assign งาน หรือ SUPER_ADMIN; atomic first-use       |
-| GET `/admin/reports`            | eventId?                                                           | EVENT_MANAGER/PAYMENT_REVIEWER; รายงานแยกสถานะและเงิน                 |
+| POST `/check-in`                | `{eventId,token}`                                                  | ADMIN/SUPER_ADMIN ทุกงาน; atomic first-use                            |
+| GET `/admin/reports`            | eventId?                                                           | ADMIN/SUPER_ADMIN; รายงานแยกสถานะและเงิน                              |
 | GET `/admin/business-profile`   | —                                                                  | SUPER_ADMIN                                                           |
 | PATCH `/admin/business-profile` | displayName,logo?,contact,paymentInstructions,bookingPolicy,theme? | SUPER_ADMIN; JSON objects ที่ผ่าน validation                          |
 | GET `/admin/staff`              | q,page,pageSize                                                    | SUPER_ADMIN; `{items,total,page,pageSize}`                            |
-| POST `/admin/staff`             | `{userId,roles,assignedEventIds,reason}`                           | SUPER_ADMIN; ไม่รับการสมัคร public เพิ่ม role                         |
+| POST `/admin/staff`             | `{userId,role:CUSTOMER                                             | ADMIN                                                                 | SUPER_ADMIN,reason}` | SUPER_ADMIN; ไม่รับการสมัคร public เพิ่ม role |
 | GET `/admin/audit`              | entityId?,page,pageSize                                            | SUPER_ADMIN; `{items,total,page,pageSize}` ไม่มี credentials          |
 | POST `/jobs/expire`             | Bearer JOB_SECRET                                                  | `{examined,expired,more,serverNow,overdueReviews,overdueCorrections}` |
 

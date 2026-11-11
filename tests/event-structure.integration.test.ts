@@ -70,12 +70,10 @@ test(
     const staff: Actor = {
       id: adminUser.id,
       roles: adminUser.roles,
-      assignedEventIds: [],
     };
     const customer: Actor = {
       id: customerUser.id,
       roles: customerUser.roles,
-      assignedEventIds: [],
     };
     const version = async (id: string) =>
       (await prisma.event.findUniqueOrThrow({ where: { id } })).version;
