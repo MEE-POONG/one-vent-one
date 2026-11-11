@@ -11,9 +11,9 @@ import {
   PageHeading,
   Pagination,
 } from "@/components/ui";
-export function EventList() {
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
+export function EventList({ initialQuery = "" }: { initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [search, setSearch] = useState(initialQuery);
   const [page, setPage] = useState(1);
   const resource = useResource<PageData<EventData>>(
     `/api/events?q=${encodeURIComponent(search)}&page=${page}&pageSize=12`,

@@ -38,7 +38,7 @@ export default async function RootLayout({
         </a>
         <SiteHeader />
         <main id="main-content">{children}</main>
-        <footer className="site-footer" id="contact">
+        <footer className="site-footer">
           <div>
             <Link className="brand" href="/">
               MONGKOL<span>BAR</span>
