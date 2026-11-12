@@ -1,8 +1,9 @@
 import "server-only";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
@@ -82,7 +83,44 @@ export const auth = betterAuth({
   },
 });
 
-export type Actor = { id: string; roles: Role[] };
+export type Actor = {
+  id: string;
+  roles: Role[];
+  isGuest?: boolean;
+  guestActorId?: string;
+};
+
+const GUEST_COOKIE_NAME = "ovo_guest_actor";
+
+function guestSigningSecret() {
+  return (
+    process.env.BETTER_AUTH_SECRET ||
+    process.env.TICKET_ENCRYPTION_KEY ||
+    "oneventone-guest-signing-secret"
+  );
+}
+
+function signGuestUserId(userId: string) {
+  const mac = createHmac("sha256", guestSigningSecret())
+    .update(`guest:${userId}`)
+    .digest("base64url");
+  return `${userId}.${mac}`;
+}
+
+function verifyGuestCookie(raw?: string | null): string | null {
+  if (!raw) return null;
+  const parts = raw.split(".");
+  if (parts.length !== 2) return null;
+  const [userId, mac] = parts;
+  if (!/^[a-f\d]{24}$/i.test(userId) || !mac) return null;
+  const expected = createHmac("sha256", guestSigningSecret())
+    .update(`guest:${userId}`)
+    .digest("base64url");
+  const a = Buffer.from(mac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  return userId;
+}
 
 export async function requireActor(request?: Request): Promise<Actor> {
   const session = await auth.api.getSession({
@@ -101,4 +139,66 @@ export async function requireActor(request?: Request): Promise<Actor> {
   });
   if (!user) throw new DomainError("UNAUTHENTICATED", "ไม่พบบัญชีผู้ใช้", 401);
   return { id: user.id, roles: user.roles };
+}
+
+export async function requireCustomerOrGuestActor(
+  request?: Request,
+  options: { createIfMissing?: boolean } = {},
+): Promise<Actor> {
+  const reqHeaders = request?.headers ?? (await headers());
+  const cookieStore = await cookies();
+  const rawGuestCookie = cookieStore.get(GUEST_COOKIE_NAME)?.value;
+  const verifiedGuestId = verifyGuestCookie(rawGuestCookie);
+
+  const session = await auth.api.getSession({ headers: reqHeaders });
+  if (session) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, roles: true },
+    });
+    if (user) {
+      return {
+        id: user.id,
+        roles: user.roles,
+        isGuest: false,
+        guestActorId: verifiedGuestId ?? undefined,
+      };
+    }
+  }
+
+  if (verifiedGuestId) {
+    const guestUser = await prisma.user.findUnique({
+      where: { id: verifiedGuestId },
+      select: { id: true, roles: true },
+    });
+    if (guestUser) {
+      return { id: guestUser.id, roles: guestUser.roles, isGuest: true };
+    }
+  }
+
+  if (!options.createIfMissing) {
+    throw new DomainError(
+      "UNAUTHENTICATED",
+      "ไม่พบเซสชันการจอง กรุณาเลือกที่นั่งและทำรายการใหม่อีกครั้ง",
+      401,
+    );
+  }
+
+  const createdGuest = await prisma.user.create({
+    data: {
+      name: "ลูกค้าทั่วไป (Guest)",
+      email: `guest-${randomUUID()}@guest.oneventone.local`,
+      roles: ["CUSTOMER"],
+    },
+    select: { id: true, roles: true },
+  });
+
+  cookieStore.set(GUEST_COOKIE_NAME, signGuestUserId(createdGuest.id), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return { id: createdGuest.id, roles: createdGuest.roles, isGuest: true };
 }

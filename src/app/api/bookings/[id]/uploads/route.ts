@@ -1,4 +1,4 @@
-import { requireActor } from "@/server/auth";
+import { requireCustomerOrGuestActor } from "@/server/auth";
 import { api, readBody, idempotencyKey } from "@/server/http";
 import { invariant } from "@/server/errors";
 import { objectIdSchema } from "@/shared/booking";
@@ -6,7 +6,7 @@ import { uploadEvidence } from "@/server/storage";
 import { rateLimit } from "@/server/rate-limit";
 export const runtime = "nodejs";
 export const POST = api(async (request, context) => {
-  const actor = await requireActor(request);
+  const actor = await requireCustomerOrGuestActor(request);
   await rateLimit(actor.id, "upload", 12);
   const key = idempotencyKey(request);
   const type = request.headers.get("content-type") || "";

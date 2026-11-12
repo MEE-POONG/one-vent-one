@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, RefreshCw, Sparkles, UserCheck } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 import { api, ApiError, useResource } from "@/lib/client-api";
 import type { Availability, Booking, EventData } from "@/lib/client-types";
 import {
@@ -18,6 +19,7 @@ import { VenueView } from "@/components/venue-view";
 
 export function BookingPicker({ slug }: { slug: string }) {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
   const eventResource = useResource<EventData>(
     `/api/events?slug=${encodeURIComponent(slug)}`,
   );
@@ -231,6 +233,36 @@ export function BookingPicker({ slug }: { slug: string }) {
               <span /> BOOKING SUMMARY
             </div>
             <h2>การจองของคุณ</h2>
+            <div className="guest-mode-banner">
+              {session?.user ? (
+                <>
+                  <UserCheck size={18} />
+                  <div>
+                    <strong>จองในนามสมาชิก: {session.user.name}</strong>
+                    <small>
+                      บันทึกประวัติการจองและดูบัตรย้อนหลังได้ในเมนู{" "}
+                      <Link href="/account/bookings" className="text-link">
+                        การจองของฉัน
+                      </Link>
+                    </small>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  <div>
+                    <strong>จองได้ทันทีโดยไม่ต้องเข้าสู่ระบบ (Guest)</strong>
+                    <small>
+                      ชำระเงินผ่าน QR และรับบัตรเข้างานได้ทันที หรือ{" "}
+                      <Link href="/login" className="text-link">
+                        เข้าสู่ระบบ
+                      </Link>{" "}
+                      หากต้องการเก็บประวัติการจองไว้ในบัญชี
+                    </small>
+                  </div>
+                </>
+              )}
+            </div>
             {selectedUnits.length || selectedTypes.length ? (
               <ul className="summary-list">
                 {selectedUnits.map((u) => (

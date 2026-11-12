@@ -92,7 +92,7 @@ export async function getTickets(actor: Actor, bookingId: string) {
   if (booking.status !== "CONFIRMED")
     return { tickets: [], serverNow: new Date().toISOString() };
   const tickets = await prisma.ticket.findMany({
-    where: { bookingId, ownerId: actor.id },
+    where: { bookingId, ownerId: booking.userId },
     include: { bookingItem: true },
     orderBy: [{ bookingItemId: "asc" }, { admissionSequence: "asc" }],
   });
@@ -114,5 +114,114 @@ export async function getTickets(actor: Actor, bookingId: string) {
             ),
     })),
     serverNow: new Date().toISOString(),
+  };
+}
+
+export function extractTicketToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (/^[A-Za-z0-9_-]{43}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/\/tickets\/verify\/([A-Za-z0-9_-]{43})(?:[/?#]|$)/);
+  if (match) return match[1];
+  return null;
+}
+
+export async function inspectTicketByToken(rawToken: string) {
+  const token = extractTicketToken(rawToken);
+  if (!token) {
+    throw new DomainError(
+      "TICKET_INVALID",
+      "รูปแบบรหัสบัตรไม่ถูกต้อง กรุณาใช้ QR Code จากระบบ OneVentOne",
+      422,
+    );
+  }
+  const tokenHash = hashTicketToken(token);
+  const ticket = await prisma.ticket.findUnique({
+    where: { tokenHash },
+    include: {
+      event: true,
+      booking: true,
+      bookingItem: true,
+      owner: { select: { name: true, email: true } },
+      usedBy: { select: { name: true } },
+      checkIns: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      },
+    },
+  });
+
+  if (!ticket) {
+    throw new DomainError(
+      "TICKET_INVALID",
+      "ไม่พบข้อมูลบัตรนี้ในระบบ อาจเป็นบัตรปลอมหรือรหัสไม่ถูกต้อง",
+      404,
+    );
+  }
+
+  const itemSnap = (ticket.bookingItem.snapshot ?? {}) as Record<string, unknown>;
+  const bookingSnap = (ticket.booking.snapshot ?? {}) as Record<string, unknown>;
+  const isEventActive = ["PUBLISHED", "CLOSED"].includes(ticket.event.status);
+  const isGenuineActive =
+    ticket.status === "ACTIVE" &&
+    ticket.booking.status === "CONFIRMED" &&
+    isEventActive;
+
+  return {
+    valid: isGenuineActive,
+    ticketId: ticket.id,
+    token,
+    status: ticket.status,
+    admissionSequence: ticket.admissionSequence,
+    totalItemAdmissions: ticket.bookingItem.admissionCount,
+    sellingMode: ticket.bookingItem.sellingMode,
+    itemLabel: String(
+      itemSnap.unitName ||
+        itemSnap.ticketTypeName ||
+        itemSnap.unitCode ||
+        "บัตรเข้างาน",
+    ),
+    unitCode: itemSnap.unitCode ? String(itemSnap.unitCode) : null,
+    zoneName: String(itemSnap.zoneName || "โซนมาตรฐาน"),
+    holderName: ticket.owner.name,
+    isGuestBooking: ticket.owner.email.endsWith("@guest.oneventone.local"),
+    booking: {
+      id: ticket.booking.id,
+      bookingNumber: ticket.booking.bookingNumber,
+      status: ticket.booking.status,
+      totalSatang: ticket.booking.totalSatang,
+      totalAdmissions: ticket.booking.totalAdmissions,
+      confirmedAt: ticket.booking.confirmedAt?.toISOString() ?? null,
+      createdAt: ticket.booking.createdAt.toISOString(),
+      paymentMethod:
+        bookingSnap.paymentMode === "DEMO_QR"
+          ? "QR Code อัตโนมัติ (Instant QR)"
+          : "โอนชำระและตรวจสอบแล้ว",
+    },
+    event: {
+      id: ticket.event.id,
+      slug: ticket.event.slug,
+      title: ticket.event.title,
+      venue: ticket.event.venue,
+      artists: ticket.event.artists,
+      posterUrl: ticket.event.posterUrl,
+      startsAt: ticket.event.startsAt.toISOString(),
+      endsAt: ticket.event.endsAt.toISOString(),
+      status: ticket.event.status,
+    },
+    verification: {
+      verificationCode: `VER-${tokenHash.slice(0, 12).toUpperCase()}`,
+      sha256Fingerprint: `${tokenHash.slice(0, 10).toUpperCase()} •••• ${tokenHash.slice(-10).toUpperCase()}`,
+      fullHashPrefix: tokenHash.slice(0, 24).toUpperCase(),
+      encryptionSuite: "AES-256-GCM + SHA-256 Digital Seal",
+      layoutVersionId: String(
+        itemSnap.layoutVersionId || ticket.booking.layoutVersionId || "STD-V1",
+      ),
+      issuedAt: ticket.createdAt.toISOString(),
+      usedAt: ticket.usedAt?.toISOString() ?? null,
+      usedByStaff: ticket.usedBy?.name ?? null,
+      revokedAt: ticket.revokedAt?.toISOString() ?? null,
+      checkInAttempts: ticket.checkIns.length,
+      serverVerifiedAt: new Date().toISOString(),
+    },
   };
 }

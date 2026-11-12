@@ -2,8 +2,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Camera, CheckCircle2, ScanLine } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
-import { useMutation, useResource } from "@/lib/client-api";
-import type { EventData, PageData } from "@/lib/client-types";
+import { api, useMutation, useResource } from "@/lib/client-api";
+import type {
+  EventData,
+  PageData,
+  VerifiedTicketInspection,
+} from "@/lib/client-types";
 import {
   dateTime,
   Empty,
@@ -13,8 +17,16 @@ import {
   PageHeading,
   Pagination,
 } from "@/components/ui";
+import { VerifiedTicketFlipCard } from "@/features/tickets/verified-ticket-card";
 
 type CheckInResult = { ticketId: string; status: string; usedAt: string };
+
+function parseScannedToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (/^[A-Za-z0-9_-]{43}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/\/tickets\/verify\/([A-Za-z0-9_-]{43})(?:[/?#]|$)/);
+  return match ? match[1] : null;
+}
 
 export function CheckInDesk() {
   const [page, setPage] = useState(1);
@@ -25,6 +37,9 @@ export function CheckInDesk() {
   const [eventId, setEventId] = useState("");
   const [token, setToken] = useState("");
   const [result, setResult] = useState<CheckInResult | null>(null);
+  const [inspected, setInspected] = useState<VerifiedTicketInspection | null>(
+    null,
+  );
   const [cameraError, setCameraError] = useState<Error | null>(null);
   const [cameraState, setCameraState] = useState<"off" | "starting" | "on">(
     "off",
@@ -63,10 +78,11 @@ export function CheckInDesk() {
 
   async function submit(raw: string, selectedEvent = currentEvent.current) {
     if (busy.current) return;
-    if (!selectedEvent || !/^[A-Za-z0-9_-]{43}$/.test(raw.trim())) {
+    const parsedToken = parseScannedToken(raw);
+    if (!selectedEvent || !parsedToken) {
       setCameraError(
         new Error(
-          "กรุณาเลือกงานและใช้รหัสบัตร 43 ตัวอักษรจาก QR ของ OneVentOne",
+          "กรุณาเลือกงานและใช้รหัสบัตร 43 ตัวอักษร หรือสแกน QR ของ OneVentOne",
         ),
       );
       return;
@@ -74,16 +90,22 @@ export function CheckInDesk() {
     busy.current = true;
     scanningPaused.current = true;
     setResult(null);
+    setInspected(null);
     setCameraError(null);
     try {
-      setResult(
-        await mutation.run<CheckInResult>("/api/check-in", {
-          eventId: selectedEvent,
-          token: raw.trim(),
-        }),
-      );
+      const checked = await mutation.run<CheckInResult>("/api/check-in", {
+        eventId: selectedEvent,
+        token: parsedToken,
+      });
+      setResult(checked);
     } catch {
     } finally {
+      try {
+        const detail = await api<VerifiedTicketInspection>(
+          `/api/tickets/verify/${encodeURIComponent(parsedToken)}`,
+        );
+        setInspected(detail);
+      } catch {}
       busy.current = false;
     }
   }
@@ -129,6 +151,7 @@ export function CheckInDesk() {
   function nextTicket() {
     setToken("");
     setResult(null);
+    setInspected(null);
     setCameraError(null);
     mutation.setError(null);
     scanningPaused.current = false;
@@ -219,9 +242,8 @@ export function CheckInDesk() {
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck={false}
-                maxLength={43}
                 required
-                placeholder="รหัสบัตร 43 ตัวอักษร"
+                placeholder="รหัสบัตร 43 ตัวอักษร หรือลิงก์จาก QR"
               />
             </Field>
             <div className="actions">
@@ -229,7 +251,7 @@ export function CheckInDesk() {
                 className="button"
                 disabled={
                   !eventId ||
-                  token.trim().length !== 43 ||
+                  !parseScannedToken(token) ||
                   mutation.pending ||
                   Boolean(result)
                 }
@@ -259,6 +281,14 @@ export function CheckInDesk() {
                 <strong>ตรวจบัตรสำเร็จ · อนุญาตให้เข้างาน 1 คน</strong>
                 <p>บันทึกเวลา {dateTime(result.usedAt)}</p>
               </div>
+            </div>
+          ) : null}
+          {inspected ? (
+            <div style={{ marginTop: 18 }}>
+              <VerifiedTicketFlipCard
+                data={inspected}
+                showStaffAction={false}
+              />
             </div>
           ) : null}
         </div>

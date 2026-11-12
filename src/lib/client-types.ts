@@ -186,6 +186,54 @@ export interface Ticket {
   usedAt?: string | null;
   itemLabel: string;
 }
+export interface VerifiedTicketInspection {
+  valid: boolean;
+  ticketId: string;
+  token: string;
+  status: "ACTIVE" | "USED" | "REVOKED" | string;
+  admissionSequence: number;
+  totalItemAdmissions: number;
+  sellingMode: string;
+  itemLabel: string;
+  unitCode: string | null;
+  zoneName: string;
+  holderName: string;
+  isGuestBooking: boolean;
+  booking: {
+    id: string;
+    bookingNumber: string;
+    status: string;
+    totalSatang: number;
+    totalAdmissions: number;
+    confirmedAt: string | null;
+    createdAt: string;
+    paymentMethod: string;
+  };
+  event: {
+    id: string;
+    slug: string;
+    title: string;
+    venue: string;
+    artists: string[];
+    posterUrl?: string | null;
+    startsAt: string;
+    endsAt: string;
+    status: string;
+  };
+  verification: {
+    verificationCode: string;
+    sha256Fingerprint: string;
+    fullHashPrefix: string;
+    encryptionSuite: string;
+    layoutVersionId: string;
+    issuedAt: string;
+    usedAt: string | null;
+    usedByStaff: string | null;
+    revokedAt: string | null;
+    checkInAttempts: number;
+    serverVerifiedAt: string;
+  };
+}
 export interface PageData<T> {
   items: T[];
   total: number;

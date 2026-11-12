@@ -9,7 +9,10 @@ import {
   CheckCircle2,
   Ticket as TicketIcon,
   ScanLine,
+  Smartphone,
+  ExternalLink,
 } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 import { useMutation, useResource } from "@/lib/client-api";
 import type { Booking, Business, Ticket } from "@/lib/client-types";
 import {
@@ -287,45 +290,92 @@ function Tickets({ bookingId }: { bookingId: string }) {
   const resource = useResource<{ tickets: Ticket[] }>(
     `/api/bookings/${bookingId}/tickets`,
   );
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
   return (
     <section>
       <div className="section-head">
         <h2>บัตรเข้างานของคุณ</h2>
         <TicketIcon size={24} />
       </div>
+      <div className="ticket-save-advisory">
+        <div className="ticket-save-advisory-icon">
+          <Smartphone size={22} />
+        </div>
+        <div>
+          <strong>
+            คำแนะนำสำคัญ: กรุณาบันทึกภาพหน้าจอ (Screenshot) เก็บไว้ในโทรศัพท์มือถือ
+          </strong>
+          <p>
+            แนะนำให้ถ่ายภาพหน้าจอ (Capture Screen) หรือเซฟรูป QR Code
+            ของบัตรแต่ละใบไว้ในคลังภาพสมาร์ตโฟนของคุณ
+            เพื่อความสะดวกรวดเร็วในการแสดงให้เจ้าหน้าที่สแกนเข้างานในวันจริง
+            โดยเฉพาะผู้ที่จองแบบไม่ได้เข้าสู่ระบบซึ่งจะไม่มีประวัติการจองเก็บไว้ในบัญชีสมาชิก
+          </p>
+        </div>
+      </div>
       <ErrorNotice error={resource.error} retry={resource.reload} />
       {resource.loading ? (
         <Loading />
       ) : resource.data?.tickets.length ? (
         <div className="ticket-grid">
-          {resource.data.tickets.map((ticket) => (
-            <article className="ticket-card" key={ticket.id}>
-              <h3>{ticket.itemLabel || "บัตรเข้างาน"}</h3>
-              <Status value={ticket.status} />
-              {ticket.status === "ACTIVE" && ticket.token ? (
-                <>
-                  <div className="ticket-qr">
-                    <QRCodeSVG value={ticket.token} size={176} level="M" />
-                  </div>
-                  <p className="muted" style={{ fontSize: 12 }}>
-                    แสดงบัตรนี้กับเจ้าหน้าที่หน้างาน
-                    <br />
-                    หนึ่งบัตรสำหรับหนึ่งคน
-                  </p>
-                  <details>
-                    <summary>แสดงรหัสสำหรับกรอกด้วยมือ</summary>
-                    <code>{ticket.token}</code>
-                  </details>
-                </>
-              ) : (
-                <p style={{ marginTop: 20 }}>
-                  {ticket.usedAt
-                    ? `ใช้เมื่อ ${dateTime(ticket.usedAt)}`
-                    : "บัตรนี้ไม่พร้อมใช้งาน"}
-                </p>
-              )}
-            </article>
-          ))}
+          {resource.data.tickets.map((ticket) => {
+            const verifyUrl = `${origin}/tickets/verify/${encodeURIComponent(ticket.token)}`;
+            return (
+              <article className="ticket-card" key={ticket.id}>
+                <div className="between" style={{ gap: 10 }}>
+                  <h3>{ticket.itemLabel || "บัตรเข้างาน"}</h3>
+                  <Status value={ticket.status} />
+                </div>
+                <small className="muted">
+                  ลำดับสิทธิ์ใบที่ {ticket.admissionSequence}
+                </small>
+                {ticket.status === "ACTIVE" && ticket.token ? (
+                  <>
+                    <div className="ticket-qr">
+                      <QRCodeSVG value={verifyUrl} size={176} level="M" />
+                    </div>
+                    <p className="muted" style={{ fontSize: 12 }}>
+                      แสดง QR Code นี้ให้เจ้าหน้าที่สแกนหน้างาน
+                      <br />
+                      หนึ่งบัตรใช้สแกนเข้างานได้ 1 ท่าน
+                    </p>
+                    <Link
+                      href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
+                      className="view-all-button ticket-verify-link"
+                    >
+                      <ScanLine size={16} />
+                      <span>เปิดหน้าตรวจสอบบัตร (หลังสแกน QR)</span>
+                      <ExternalLink size={14} />
+                    </Link>
+                    <details>
+                      <summary>แสดงรหัสสำหรับกรอกด้วยมือ</summary>
+                      <code>{ticket.token}</code>
+                    </details>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ marginTop: 20 }}>
+                      {ticket.usedAt
+                        ? `ใช้สแกนเข้างานเมื่อ ${dateTime(ticket.usedAt)}`
+                        : "บัตรนี้ไม่พร้อมใช้งาน"}
+                    </p>
+                    {ticket.token ? (
+                      <Link
+                        href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
+                        className="view-all-button ticket-verify-link"
+                        style={{ marginTop: 12 }}
+                      >
+                        <ScanLine size={16} />
+                        <span>ดูหน้าตรวจสอบบัตร</span>
+                        <ExternalLink size={14} />
+                      </Link>
+                    ) : null}
+                  </>
+                )}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <Empty title="ยังไม่มีบัตรพร้อมแสดง" />
@@ -340,6 +390,7 @@ export function BookingDetail({
   bookingId: string;
   checkout?: boolean;
 }) {
+  const { data: session } = authClient.useSession();
   const resource = useResource<Booking>(`/api/bookings/${bookingId}`, 10000);
   const business = useResource<Business>("/api/business-profile");
   const cancel = useMutation();
@@ -362,11 +413,19 @@ export function BookingDetail({
     <div className="mongkol-page customer-page">
       <div className="mongkol-container section">
         <Link
-          href="/account/bookings"
+          href={
+            session?.user
+              ? "/account/bookings"
+              : `/events/${booking.event.slug}`
+          }
           className="view-all-button customer-back-link"
         >
           <ArrowLeft size={17} />
-          <span>กลับไปการจองของฉัน</span>
+          <span>
+            {session?.user
+              ? "กลับไปการจองของฉัน"
+              : "กลับไปหน้ารายละเอียดอีเวนต์"}
+          </span>
         </Link>
         <div style={{ marginTop: 26 }}>
           <div className="section-kicker" style={{ marginBottom: 8 }}>

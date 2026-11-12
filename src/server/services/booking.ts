@@ -53,7 +53,10 @@ export async function ownedBooking(
     include: { items: true },
   });
   if (!booking) throw notFound();
-  if (booking.userId !== actor.id && !(staffAllowed && hasRole(actor, "ADMIN")))
+  const isOwner =
+    booking.userId === actor.id ||
+    Boolean(actor.guestActorId && booking.userId === actor.guestActorId);
+  if (!isOwner && !(staffAllowed && hasRole(actor, "ADMIN")))
     throw new DomainError("FORBIDDEN", "คุณไม่มีสิทธิ์เข้าถึงรายการนี้", 403);
   return booking;
 }
