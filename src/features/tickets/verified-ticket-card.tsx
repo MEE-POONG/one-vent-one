@@ -103,7 +103,7 @@ export function VerifiedTicketFlipCard({
                   <div>
                     <strong>ALREADY CHECKED IN · บัตรนี้ใช้เข้างานแล้ว</strong>
                     <small>
-                      สแกนเข้างานเมื่อ{" "}
+                      ใช้เข้างานเมื่อ{" "}
                       {data.verification.usedAt
                         ? dateTime(data.verification.usedAt)
                         : "ก่อนหน้านี้"}{" "}
@@ -269,17 +269,17 @@ export function VerifiedTicketFlipCard({
                     {data.status === "ACTIVE" ? (
                       <>
                         <strong className="text-valid">
-                          ยังไม่เคยถูกสแกนเข้างาน (พร้อมใช้เข้างานได้ 1 ท่าน)
+                          ยังไม่เคยใช้เข้างาน (พร้อมใช้เข้างานได้ 1 ท่าน)
                         </strong>
                         <span>
-                          จำนวนครั้งที่สแกนบันทึกเข้างาน:{" "}
+                          จำนวนครั้งที่ตรวจบัตรเข้างาน:{" "}
                           {data.verification.checkInAttempts} ครั้ง
                         </span>
                       </>
                     ) : data.status === "USED" ? (
                       <>
                         <strong className="text-used">
-                          ถูกสแกนใช้เข้างานไปแล้วเมื่อ{" "}
+                          ใช้เข้างานไปแล้วเมื่อ{" "}
                           {data.verification.usedAt
                             ? dateTime(data.verification.usedAt)
                             : "-"}
@@ -389,11 +389,11 @@ export function TicketVerificationView({ token }: { token: string }) {
 
         <div style={{ marginTop: 26, marginBottom: 24 }}>
           <div className="section-kicker" style={{ marginBottom: 8 }}>
-            <span /> QR SCANNER VERIFICATION RESULT
+            <span /> YOUR ENTRY PASS
           </div>
-          <h1>ผลการสแกนตรวจสอบบัตรเข้างาน</h1>
+          <h1>บัตรเข้างานของคุณ</h1>
           <p className="muted" style={{ marginTop: 6 }}>
-            แสดงข้อมูลทั่วไปบนหน้าบัตร และสามารถกดพลิกดูหลังบัตรเพื่อตรวจสอบความถูกต้องของบัตรจริงได้
+            แสดงบัตรนี้ให้เจ้าหน้าที่ตรวจสอบก่อนเข้างาน หนึ่งบัตรใช้เข้างานได้ 1 ท่าน
           </p>
         </div>
 

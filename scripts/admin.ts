@@ -18,7 +18,7 @@ import { PrismaClient } from "@prisma/client";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
-const MIN_PASSWORD = 12;
+const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 128;
 const prisma = new PrismaClient();
 const auth = betterAuth({

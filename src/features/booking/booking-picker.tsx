@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, RefreshCw, Sparkles, UserCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { api, ApiError, useResource } from "@/lib/client-api";
 import type { Availability, Booking, EventData } from "@/lib/client-types";
@@ -19,7 +19,8 @@ import { VenueView } from "@/components/venue-view";
 
 export function BookingPicker({ slug }: { slug: string }) {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const loginHref = `/login?next=${encodeURIComponent(`/events/${encodeURIComponent(slug)}/booking`)}`;
   const eventResource = useResource<EventData>(
     `/api/events?slug=${encodeURIComponent(slug)}`,
   );
@@ -56,6 +57,10 @@ export function BookingPicker({ slug }: { slug: string }) {
     );
   }
   async function book() {
+    if (!session?.user) {
+      router.push(loginHref);
+      return;
+    }
     if (!event) return;
     const payload = {
       eventId: event.id,
@@ -83,6 +88,10 @@ export function BookingPicker({ slug }: { slug: string }) {
       });
       router.push(`/checkout/${booking.id}`);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        router.push(loginHref);
+        return;
+      }
       setError(e instanceof Error ? e : new Error("สร้างการจองไม่สำเร็จ"));
       if (e instanceof ApiError && e.code === "INVENTORY_UNAVAILABLE") {
         await availability.reload();
@@ -99,7 +108,10 @@ export function BookingPicker({ slug }: { slug: string }) {
     return (
       <div className="mongkol-page customer-page">
         <div className="mongkol-container section">
-          <ErrorNotice error={eventResource.error} retry={eventResource.reload} />
+          <ErrorNotice
+            error={eventResource.error}
+            retry={eventResource.reload}
+          />
         </div>
       </div>
     );
@@ -107,7 +119,10 @@ export function BookingPicker({ slug }: { slug: string }) {
   return (
     <div className="mongkol-page customer-page">
       <div className="mongkol-container section">
-        <Link href={`/events/${slug}`} className="view-all-button customer-back-link">
+        <Link
+          href={`/events/${slug}`}
+          className="view-all-button customer-back-link"
+        >
           <ArrowLeft size={17} />
           <span>กลับไปดูรายละเอียดอีเวนต์</span>
         </Link>
@@ -115,7 +130,10 @@ export function BookingPicker({ slug }: { slug: string }) {
           <div className="section-kicker" style={{ marginBottom: 8 }}>
             <span /> INTERACTIVE FLOOR PLAN
           </div>
-          <PageHeading title="เลือกโต๊ะและที่นั่งของคุณ" description={event.title} />
+          <PageHeading
+            title="เลือกโต๊ะและที่นั่งของคุณ"
+            description={event.title}
+          />
         </div>
         <div className="booking-workspace">
           <div className="stack">
@@ -145,11 +163,15 @@ export function BookingPicker({ slug }: { slug: string }) {
                 />
               ) : null}
               <div className="legend">
-                {["AVAILABLE", "HELD", "REVIEW_RESERVED", "SOLD", "BLOCKED"].map(
-                  (status) => (
-                    <Status key={status} value={status} />
-                  ),
-                )}
+                {[
+                  "AVAILABLE",
+                  "HELD",
+                  "REVIEW_RESERVED",
+                  "SOLD",
+                  "BLOCKED",
+                ].map((status) => (
+                  <Status key={status} value={status} />
+                ))}
               </div>
               <ErrorNotice
                 error={availability.error}
@@ -209,7 +231,9 @@ export function BookingPicker({ slug }: { slug: string }) {
                             }
                           >
                             {Array.from(
-                              { length: Math.min(20, pool?.available || 0) + 1 },
+                              {
+                                length: Math.min(20, pool?.available || 0) + 1,
+                              },
                               (_, i) => (
                                 <option key={i} value={i}>
                                   {i}
@@ -234,34 +258,18 @@ export function BookingPicker({ slug }: { slug: string }) {
             </div>
             <h2>การจองของคุณ</h2>
             <div className="guest-mode-banner">
-              {session?.user ? (
-                <>
-                  <UserCheck size={18} />
-                  <div>
-                    <strong>จองในนามสมาชิก: {session.user.name}</strong>
-                    <small>
-                      บันทึกประวัติการจองและดูบัตรย้อนหลังได้ในเมนู{" "}
-                      <Link href="/account/bookings" className="text-link">
-                        การจองของฉัน
-                      </Link>
-                    </small>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={18} />
-                  <div>
-                    <strong>จองได้ทันทีโดยไม่ต้องเข้าสู่ระบบ (Guest)</strong>
-                    <small>
-                      ชำระเงินผ่าน QR และรับบัตรเข้างานได้ทันที หรือ{" "}
-                      <Link href="/login" className="text-link">
-                        เข้าสู่ระบบ
-                      </Link>{" "}
-                      หากต้องการเก็บประวัติการจองไว้ในบัญชี
-                    </small>
-                  </div>
-                </>
-              )}
+              <UserCheck size={18} />
+              <div>
+                <strong>
+                  จองในนามสมาชิก: {session?.user.name ?? "กำลังตรวจสอบบัญชี"}
+                </strong>
+                <small>
+                  บันทึกประวัติการจองและดูบัตรย้อนหลังได้ในเมนู{" "}
+                  <Link href="/account/bookings" className="text-link">
+                    การจองของฉัน
+                  </Link>
+                </small>
+              </div>
             </div>
             {selectedUnits.length || selectedTypes.length ? (
               <ul className="summary-list">
@@ -310,14 +318,17 @@ export function BookingPicker({ slug }: { slug: string }) {
                 onChange={(e) => setAccepted(e.target.checked)}
               />
               <span>
-                รับทราบเงื่อนไขการจอง และจะทดสอบชำระเงินผ่าน QR ภายใน 5 นาที (เดโม ไม่มีการรับเงินจริง)
+                รับทราบเงื่อนไขการจอง และจะทดสอบชำระเงินผ่าน QR ภายใน 5 นาที
+                (เดโม ไม่มีการรับเงินจริง)
               </span>
             </label>
             <ErrorNotice error={error} />
             <button
               className="mongkol-button button-wide"
               style={{ marginTop: 16 }}
-              disabled={!accepted || admissions === 0 || pending}
+              disabled={
+                !accepted || admissions === 0 || pending || sessionPending
+              }
               onClick={book}
             >
               {pending ? "กำลังสร้างการจอง" : "ยืนยันและไปชำระเงิน"}

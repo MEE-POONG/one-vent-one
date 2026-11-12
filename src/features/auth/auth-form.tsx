@@ -5,7 +5,13 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { isStaff, rolesOf } from "@/lib/roles";
 import { ErrorNotice, Field } from "@/components/ui";
-export function AuthForm({ signup = false }: { signup?: boolean }) {
+export function AuthForm({
+  signup = false,
+  returnTo,
+}: {
+  signup?: boolean;
+  returnTo?: string;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   return (
@@ -43,15 +49,15 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
                     ? `ที่อยู่เว็บ ${window.location.origin} ไม่ตรงกับ BETTER_AUTH_URL ที่ตั้งไว้ในไฟล์ .env กรุณาเปิดเว็บจากที่อยู่นั้น หรือเพิ่มใน TRUSTED_ORIGINS`
                     : result.error.message || "เข้าสู่ระบบไม่สำเร็จ",
                 );
-              const next = new URLSearchParams(window.location.search).get(
-                "next",
-              );
               // Staff (owner and admins) land on the back office; customers on
               // their bookings.
               const home = isStaff(rolesOf(result.data))
                 ? "/admin"
                 : "/account/bookings";
-              const destination = new URL(next || home, window.location.origin);
+              const destination = new URL(
+                returnTo || home,
+                window.location.origin,
+              );
               window.location.assign(
                 destination.origin === window.location.origin
                   ? destination.href
@@ -88,13 +94,13 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
           </Field>
           <Field
             label="รหัสผ่าน"
-            hint={signup ? "อย่างน้อย 12 ตัวอักษร" : undefined}
+            hint={signup ? "อย่างน้อย 8 ตัวอักษร" : undefined}
           >
             <input
               name="password"
               type="password"
               required
-              minLength={signup ? 12 : 1}
+              minLength={signup ? 8 : 1}
               maxLength={128}
               autoComplete={signup ? "new-password" : "current-password"}
             />
@@ -112,7 +118,10 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
         </form>
         <p className="auth-switch">
           {signup ? "มีบัญชีแล้ว?" : "ยังไม่มีบัญชี?"}{" "}
-          <Link className="text-link" href={signup ? "/login" : "/register"}>
+          <Link
+            className="text-link"
+            href={`${signup ? "/login" : "/register"}${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`}
+          >
             {signup ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
           </Link>
         </p>

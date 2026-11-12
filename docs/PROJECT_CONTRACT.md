@@ -30,7 +30,7 @@
 - สมัครสาธารณะได้ `CUSTOMER` เท่านั้น: User.roles มี DB default และ additional field กำหนด `input: false`
 - session ใช้ cookie ของ Better Auth อายุ 7 วัน; ปิด cookie cache; server โหลด role ปัจจุบันจาก DB ทุกคำขอ
 - auth endpoint `/api/auth/[...all]`; `POST /api/auth/sign-up/email`, `sign-in/email`, `sign-out`; `GET /api/auth/get-session`
-- รหัสผ่านขั้นต่ำ 12 ตัวอักษร สูงสุด 128 ตัวอักษร
+- รหัสผ่านขั้นต่ำ 8 ตัวอักษร สูงสุด 128 ตัวอักษร ใช้กฎเดียวกันกับ CUSTOMER, ADMIN และ SUPER_ADMIN ทั้งบัญชีใหม่และการเปลี่ยนรหัสผ่านของบัญชีเดิม
 - ไม่ติดตั้ง mail service หรือ reset mail handler จึงยังไม่มี flow กู้รหัสผ่านที่ส่งอีเมลจริง
 - Better Auth ตรวจ origin/CSRF; API mutation เพิ่ม origin check; auth rate limiter เก็บใน MongoDB; operation rate limiter ใช้ ApiRateLimit ใน MongoDB
 - ไม่เชื่อ client IP headers โดยปริยาย หากอยู่หลัง proxy ต้องตั้ง `TRUSTED_CLIENT_IP_HEADER` ให้ตรง header ที่ proxy เขียนทับ และปิด direct ingress
@@ -88,8 +88,8 @@ PENDING_REVIEW/ACTION_REQUIRED ไม่หมดอายุด้วย hold t
 - LayoutTemplate เป็น draft แก้ด้วย revision check; LayoutVersion เป็น published immutable snapshot geometry มี stable IDs และตำแหน่ง ไม่ใช่แหล่งราคาหรือ availability
 - สลิปเก็บ private ใน storage adapter นอก public root; ตรวจ content/MIME/size และเจ้าของก่อน finalize; PaymentAttempt ใหม่ทุกครั้ง ไม่เขียนทับหลักฐานเก่า
 - ยอดรับจริงใช้ PaymentAttempt ที่ VERIFIED/Booking.verifiedPaymentId และ verifiedAmountSatang ไม่บวกรวมสลิปที่ส่งซ้ำ ไม่ยืนยันเงินเข้าด้วยการ upload
-- Ticket หนึ่งใบต่อ admission unique(bookingItemId,admissionSequence) ใช้ random opaque 32-byte credential ไม่มี PII เก็บ SHA-256 สำหรับ lookup และ AES-256-GCM encrypted credential เพื่อแสดง QR ซ้ำให้เจ้าของ `TICKET_ENCRYPTION_KEY` แยกจาก auth secret ไม่ log credential
-- Check-in ตรวจสิทธิ์ ADMIN/Event/Booking CONFIRMED/Ticket ACTIVE แล้ว atomic first-use มี CheckInLog; QR เก่าที่ REVOKED ใช้ไม่ได้
+- Ticket หนึ่งใบต่อ admission unique(bookingItemId,admissionSequence) ใช้ random opaque 32-byte credential ไม่มี PII เก็บ SHA-256 สำหรับ lookup และ AES-256-GCM encrypted credential เพื่อเปิดหน้าบัตรซ้ำให้เจ้าของผ่านปุ่ม “ดูบัตรเข้างาน” โดยไม่แสดง QR Code `TICKET_ENCRYPTION_KEY` แยกจาก auth secret ไม่ log credential
+- Check-in ตรวจสิทธิ์ ADMIN/Event/Booking CONFIRMED/Ticket ACTIVE แล้ว atomic first-use มี CheckInLog; บัตรเก่าที่ REVOKED ใช้ไม่ได้
 - ยกเลิกไม่เท่ากับคืนเงิน RefundRecord unique(bookingId) ติดตามคืนเต็มจำนวนหนึ่งครั้งตามเงินจริงที่ตรวจแล้ว REFUNDED ต้องมีหลักฐานการคืนเงินภายนอก เว็บไม่โอนเงินเอง
 - ไม่มี TTL บน booking/payment/refund/audit; cleanup ข้อมูลชั่วคราวต้องไม่เป็นกลไกปล่อย stock
 
@@ -97,7 +97,7 @@ PENDING_REVIEW/ACTION_REQUIRED ไม่หมดอายุด้วย hold t
 
 API base `/api`, success `{ data, meta? }`, error `{ error: { code, message, fieldErrors?, requestId? } }` ยกเว้น `/api/auth/*` ซึ่งใช้ contract ของ Better Auth โดยตรง DTO และ validation ร่วมกันอยู่ `src/shared`; Prisma และ secrets ไม่เข้า browser
 
-availability/booking response มี serverNow/expiry; client countdown ปรับจากเวลา server และ refetch เมื่อหมดเวลา; poll เฉพาะแท็บที่ active; timeout ไม่สร้าง intent/key ใหม่โดยอัตโนมัติ ไม่มี QR ก่อน backend อนุมัติ ไม่มี mock stock/payment success
+availability/booking response มี serverNow/expiry; client countdown ปรับจากเวลา server และ refetch เมื่อหมดเวลา; poll เฉพาะแท็บที่ active; timeout ไม่สร้าง intent/key ใหม่โดยอัตโนมัติ ไม่มีบัตรเข้างานก่อน backend ยืนยันการชำระเงิน
 
 แบรนด์แดง/ดำ/เทา: #0B0B0F, #18181B/#27272A, #E11D48, #F4F4F5 มี keyboard focus, status text, mobile booking, reduced motion; editor ใช้ react-konva เฉพาะ client
 

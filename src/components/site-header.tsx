@@ -109,7 +109,7 @@ export function SiteHeader() {
           {searchOpen ? <X size={19} /> : <Search size={19} />}
         </button>
         {session ? <button className="button button-outline header-auth" onClick={async () => { await authClient.signOut(); window.location.assign(new URL("/", window.location.origin).href); }}><LogOut size={17} /><span>ออกจากระบบ</span></button> : <Link href="/login" className="button button-outline header-auth"><UserRound size={17} /><span>เข้าสู่ระบบ</span></Link>}
-        <button className="header-menu" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู"><Menu size={21} /></button>
+        <button className="header-menu" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู" aria-expanded={menuOpen} aria-controls="site-menu"><Menu size={21} /></button>
       </div>
     </div>
     {searchOpen ? (
@@ -172,7 +172,7 @@ export function SiteHeader() {
         <button className="search-backdrop" onClick={() => setSearchOpen(false)} aria-label="ปิดหน้าต่างค้นหา" />
       </>
     ) : null}
-    <aside className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}><button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={22} /></button><Link className="menu-logo" href="/" onClick={(e) => navigateToSection(e, "home")}>OneVent<span>One</span></Link>{menuItems.map(([name, href, sectionId], index) => <Link key={name} href={href} onClick={(e) => sectionId ? navigateToSection(e, sectionId) : setMenuOpen(false)}><span>{name}</span><small>{String(index + 1).padStart(2, "0")}</small></Link>)}<Link className="menu-login" href={session ? "/account/bookings" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "การจองของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link></aside>
+    <aside id="site-menu" className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-label="เมนูหลัก" aria-hidden={!menuOpen} inert={!menuOpen}><button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={22} /></button><Link className="menu-logo" href="/" onClick={(e) => navigateToSection(e, "home")}>OneVent<span>One</span></Link>{menuItems.map(([name, href, sectionId], index) => <Link key={name} href={href} onClick={(e) => sectionId ? navigateToSection(e, sectionId) : setMenuOpen(false)}><span>{name}</span><small>{String(index + 1).padStart(2, "0")}</small></Link>)}<Link className="menu-login" href={session ? "/account" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "โปรไฟล์ของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link></aside>
     {menuOpen ? <button className="menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" /> : null}
   </header>;
 }

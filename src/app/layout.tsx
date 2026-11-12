@@ -41,7 +41,7 @@ export default async function RootLayout({
         <footer className="site-footer">
           <div>
             <Link className="brand" href="/">
-              MONGKOL<span>BAR</span>
+              OneVent<span>One</span>
             </Link>
             <p>Every mood, all in one place</p>
           </div>

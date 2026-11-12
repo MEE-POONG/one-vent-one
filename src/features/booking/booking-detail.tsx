@@ -290,8 +290,6 @@ function Tickets({ bookingId }: { bookingId: string }) {
   const resource = useResource<{ tickets: Ticket[] }>(
     `/api/bookings/${bookingId}/tickets`,
   );
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
   return (
     <section>
       <div className="section-head">
@@ -303,14 +301,10 @@ function Tickets({ bookingId }: { bookingId: string }) {
           <Smartphone size={22} />
         </div>
         <div>
-          <strong>
-            คำแนะนำสำคัญ: กรุณาบันทึกภาพหน้าจอ (Screenshot) เก็บไว้ในโทรศัพท์มือถือ
-          </strong>
+          <strong>เปิดบัตรเข้างานจากบัญชีของคุณ</strong>
           <p>
-            แนะนำให้ถ่ายภาพหน้าจอ (Capture Screen) หรือเซฟรูป QR Code
-            ของบัตรแต่ละใบไว้ในคลังภาพสมาร์ตโฟนของคุณ
-            เพื่อความสะดวกรวดเร็วในการแสดงให้เจ้าหน้าที่สแกนเข้างานในวันจริง
-            โดยเฉพาะผู้ที่จองแบบไม่ได้เข้าสู่ระบบซึ่งจะไม่มีประวัติการจองเก็บไว้ในบัญชีสมาชิก
+            กด “ดูบัตรเข้างาน” เพื่อเปิดบัตรแต่ละใบและแสดงให้เจ้าหน้าที่ตรวจสอบ
+            คุณสามารถกลับมาเปิดบัตรได้ที่เมนูการจองของฉัน
           </p>
         </div>
       </div>
@@ -320,7 +314,6 @@ function Tickets({ bookingId }: { bookingId: string }) {
       ) : resource.data?.tickets.length ? (
         <div className="ticket-grid">
           {resource.data.tickets.map((ticket) => {
-            const verifyUrl = `${origin}/tickets/verify/${encodeURIComponent(ticket.token)}`;
             return (
               <article className="ticket-card" key={ticket.id}>
                 <div className="between" style={{ gap: 10 }}>
@@ -330,49 +323,24 @@ function Tickets({ bookingId }: { bookingId: string }) {
                 <small className="muted">
                   ลำดับสิทธิ์ใบที่ {ticket.admissionSequence}
                 </small>
-                {ticket.status === "ACTIVE" && ticket.token ? (
-                  <>
-                    <div className="ticket-qr">
-                      <QRCodeSVG value={verifyUrl} size={176} level="M" />
-                    </div>
-                    <p className="muted" style={{ fontSize: 12 }}>
-                      แสดง QR Code นี้ให้เจ้าหน้าที่สแกนหน้างาน
-                      <br />
-                      หนึ่งบัตรใช้สแกนเข้างานได้ 1 ท่าน
-                    </p>
-                    <Link
-                      href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
-                      className="view-all-button ticket-verify-link"
-                    >
-                      <ScanLine size={16} />
-                      <span>เปิดหน้าตรวจสอบบัตร (หลังสแกน QR)</span>
-                      <ExternalLink size={14} />
-                    </Link>
-                    <details>
-                      <summary>แสดงรหัสสำหรับกรอกด้วยมือ</summary>
-                      <code>{ticket.token}</code>
-                    </details>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ marginTop: 20 }}>
-                      {ticket.usedAt
-                        ? `ใช้สแกนเข้างานเมื่อ ${dateTime(ticket.usedAt)}`
-                        : "บัตรนี้ไม่พร้อมใช้งาน"}
-                    </p>
-                    {ticket.token ? (
-                      <Link
-                        href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
-                        className="view-all-button ticket-verify-link"
-                        style={{ marginTop: 12 }}
-                      >
-                        <ScanLine size={16} />
-                        <span>ดูหน้าตรวจสอบบัตร</span>
-                        <ExternalLink size={14} />
-                      </Link>
-                    ) : null}
-                  </>
-                )}
+                {ticket.status !== "ACTIVE" ? (
+                  <p style={{ marginTop: 20 }}>
+                    {ticket.usedAt
+                      ? `ใช้เข้างานเมื่อ ${dateTime(ticket.usedAt)}`
+                      : "บัตรนี้ไม่พร้อมใช้งาน"}
+                  </p>
+                ) : null}
+                {ticket.token ? (
+                  <Link
+                    href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
+                    className="mongkol-button ticket-verify-link"
+                    style={{ marginTop: 12 }}
+                  >
+                    <TicketIcon size={16} />
+                    <span>ดูบัตรเข้างาน</span>
+                    <ExternalLink size={14} />
+                  </Link>
+                ) : null}
               </article>
             );
           })}
@@ -477,7 +445,7 @@ export function BookingDetail({
                 <p>
                   {isDemo
                     ? "ชำระเงินเดโมสำเร็จ ระบบยืนยันการจองและออกบัตรให้อัตโนมัติแล้ว (ไม่มีการรับเงินจริง)"
-                    : "ยืนยันการจองแล้ว เตรียม QR สำหรับเข้างานได้ด้านล่าง"}
+                    : "ยืนยันการจองแล้ว กดดูบัตรเข้างานได้ด้านล่าง"}
                 </p>
               </div>
             ) : null}

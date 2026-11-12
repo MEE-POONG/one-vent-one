@@ -24,6 +24,8 @@
 | GET `/auth/get-session`    | —                   | session หรือ null                                            |
 | POST `/auth/sign-out`      | —                   | ยกเลิก session; client ล้างข้อมูลส่วนตัว                     |
 | GET `/me`                  | —                   | id,name,email,roles; ต้องเข้าสู่ระบบ                         |
+| PATCH `/me`                | `{name}`            | แก้ไขชื่อของตนเอง; trim 2–80 ตัวอักษร; ไม่รับ field อื่น; ต้องเข้าสู่ระบบ |
+| POST `/auth/change-password` | `{currentPassword,newPassword,revokeOtherSessions}` | Better Auth; ตรวจรหัสผ่านปัจจุบัน; รหัสผ่านใหม่ 8–128 ตัวอักษร; หน้าโปรไฟล์ส่ง revokeOtherSessions=true |
 
 ยังไม่มี mail reset API ของผลิตภัณฑ์ ไม่มีการแสดงข้อความส่งอีเมลสำเร็จโดยไม่มีบริการจริง
 
@@ -58,7 +60,9 @@ Booking detail มี `auditTimeline:[{action,createdAt,reason}]` สูงส�
 
 BookingItem มี sellingMode,unitId/ticketTypeId/poolId,quantity,admissionCount,unitPriceSatang,subtotalSatang,snapshot; admissionCount เป็นจำนวนสิทธิ์รวมของ item (โต๊ะ 1=4, ที่นั่ง 1=1, GA quantity=n=admissionCount n)
 
-Ticket DTO มี id,status,admissionSequence,usedAt,itemLabel,token; token เป็น opaque credential แบบ random ไม่มีข้อมูลส่วนตัว แสดง QR จาก token นี้เท่านั้น ไม่มี token ใน audit หรือ error logs
+การสร้างการจองผ่าน POST `/bookings` ต้องมี session สมาชิกที่เข้าสู่ระบบแล้ว ผู้ที่ไม่มี session หรือมีเพียง cookie Guest เดิมจะได้รับ HTTP 401 `UNAUTHENTICATED` โดยไม่สร้างบัญชี Guest หรือพักสิทธิ์
+
+Ticket DTO มี id,status,admissionSequence,usedAt,itemLabel,token; token เป็น opaque credential แบบ random ไม่มีข้อมูลส่วนตัว ใช้เปิดหน้าบัตรผ่านปุ่ม “ดูบัตรเข้างาน” โดยไม่แสดง QR Code ไม่มี token ใน audit หรือ error logs
 
 Upload decode/re-encode เป็น PNG เก็บนอก public directory จำกัด pixels และขนาด ตรวจ booking owner และ content จริง การ retry upload อาจเหลือไฟล์ไม่มี record อ้างอิงแต่ไม่เพิ่ม PaymentAttempt ซ้ำ เก็บ file key จาก server เท่านั้น
 

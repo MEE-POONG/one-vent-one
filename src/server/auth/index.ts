@@ -44,7 +44,7 @@ export const auth = betterAuth({
   trustedOrigins,
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 12,
+    minPasswordLength: 8,
     maxPasswordLength: 128,
     // A reset mail handler is deliberately not registered until a real mail service exists.
   },

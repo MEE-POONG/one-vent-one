@@ -1,14 +1,14 @@
 import "dotenv/config";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const baseURL = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3000";
 const enabled = process.env.RUN_HTTP_TESTS === "1";
 
 test(
-  "HTTP Better Auth: public signup cannot set roles; password login/session/logout and admin denial",
+  "HTTP Better Auth: bookings require login; public signup cannot set roles; session/logout and admin denial",
   { skip: !enabled },
   async () => {
     assert.ok(
@@ -34,6 +34,21 @@ test(
         body: JSON.stringify(body),
       });
     try {
+      const anonymousBooking = await post("/api/bookings", {});
+      assert.equal(
+        anonymousBooking.status,
+        401,
+        "Anonymous users must log in before booking",
+      );
+      assert.equal(
+        (await anonymousBooking.json()).error.code,
+        "UNAUTHENTICATED",
+      );
+      assert.ok(
+        !anonymousBooking.headers
+          .getSetCookie()
+          .some((value) => value.startsWith("ovo_guest_actor=")),
+      );
       const signup = await post("/api/auth/sign-up/email", {
         name: "Auth integration test",
         email,
@@ -50,6 +65,19 @@ test(
         include: { accounts: true },
       });
       assert.deepEqual(user.roles, ["CUSTOMER"]);
+      const guestMac = createHmac("sha256", process.env.BETTER_AUTH_SECRET!)
+        .update(`guest:${user.id}`)
+        .digest("base64url");
+      const guestBooking = await post(
+        "/api/bookings",
+        {},
+        `ovo_guest_actor=${user.id}.${guestMac}`,
+      );
+      assert.equal(
+        guestBooking.status,
+        401,
+        "A legacy guest cookie must not authorize new bookings",
+      );
       assert.notEqual(user.accounts[0].password, password);
       assert.ok(
         user.accounts[0].password && user.accounts[0].password.length > 50,
@@ -61,6 +89,12 @@ test(
         .map((value) => value.split(";")[0])
         .join("; ");
       assert.ok(cookie.includes("session_token"));
+      const memberBooking = await post("/api/bookings", {}, cookie);
+      assert.equal(
+        memberBooking.status,
+        422,
+        "Members should reach booking input validation",
+      );
       const sessions = await Promise.all(
         Array.from({ length: 8 }, () =>
           fetch(`${baseURL}/api/auth/get-session`, {

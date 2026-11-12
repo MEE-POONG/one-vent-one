@@ -130,7 +130,7 @@ export async function inspectTicketByToken(rawToken: string) {
   if (!token) {
     throw new DomainError(
       "TICKET_INVALID",
-      "รูปแบบรหัสบัตรไม่ถูกต้อง กรุณาใช้ QR Code จากระบบ OneVentOne",
+      "รูปแบบรหัสบัตรไม่ถูกต้อง กรุณาเปิดบัตรเข้างานจากการจองของคุณ",
       422,
     );
   }
