@@ -2,18 +2,24 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowRight, CalendarDays, LogOut, MapPin, Menu, Search, UserRound, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { isStaff, rolesOf } from "@/lib/roles";
 import type { EventData, PageData } from "@/lib/client-types";
 import { dateTime } from "@/components/ui";
 
-const menuItems = [["หน้าแรก", "/"], ["อีเวนต์", "/#events"], ["ติดต่อเรา", "/#contact"], ["ตรวจสอบการจอง", "/account/bookings"]];
+const menuItems = [
+  ["หน้าแรก", "/", "home"],
+  ["อีเวนต์", "/#events", "events"],
+  ["ติดต่อเรา", "/#contact", "contact"],
+  ["ตรวจสอบการจอง", "/account/bookings", ""],
+] as const;
 
 export function SiteHeader() {
   const { data: session } = authClient.useSession();
+  const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -22,6 +28,35 @@ export function SiteHeader() {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const roles = rolesOf(session);
+
+  function navigateToSection(
+    e: MouseEvent<HTMLAnchorElement>,
+    sectionId: "home" | "events" | "contact",
+  ) {
+    e.preventDefault();
+    setMenuOpen(false);
+    setSearchOpen(false);
+    const targetHref = sectionId === "home" ? "/" : `/#${sectionId}`;
+
+    if (pathname === "/") {
+      window.history.pushState(null, "", targetHref);
+      if (sectionId === "home") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem("oneventone_scroll_target", sectionId);
+    } catch {
+      // Ignore storage errors
+    }
+    router.push(targetHref, { scroll: false });
+  }
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -56,11 +91,11 @@ export function SiteHeader() {
 
   return <header className="site-header mongkol-header">
     <div className="header-inner">
-      <Link href="/" className="brand mongkol-brand" aria-label="Mongkol Bar หน้าแรก"><Image src="/mongkol-logo.png" alt="Mongkol Bar" width={180} height={60} priority /></Link>
+      <Link href="/" className="brand mongkol-brand" aria-label="Mongkol Bar หน้าแรก" onClick={(e) => navigateToSection(e, "home")}><Image src="/mongkol-logo.png" alt="Mongkol Bar" width={180} height={60} priority /></Link>
       <nav aria-label="เมนูหลัก">
-        <Link href="/">หน้าแรก</Link>
-        <Link href="/#events">อีเวนต์</Link>
-        <Link href="/#contact">ติดต่อเรา</Link>
+        <Link href="/" onClick={(e) => navigateToSection(e, "home")}>หน้าแรก</Link>
+        <Link href="/#events" onClick={(e) => navigateToSection(e, "events")}>อีเวนต์</Link>
+        <Link href="/#contact" onClick={(e) => navigateToSection(e, "contact")}>ติดต่อเรา</Link>
         {isStaff(roles) ? <Link href="/admin">จัดการระบบ</Link> : null}
       </nav>
       <div className="header-actions">
@@ -137,7 +172,7 @@ export function SiteHeader() {
         <button className="search-backdrop" onClick={() => setSearchOpen(false)} aria-label="ปิดหน้าต่างค้นหา" />
       </>
     ) : null}
-    <aside className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}><button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={22} /></button><Link className="menu-logo" href="/" onClick={() => setMenuOpen(false)}>OneVent<span>One</span></Link>{menuItems.map(([name, href], index) => <Link key={name} href={href} onClick={() => setMenuOpen(false)}><span>{name}</span><small>{String(index + 1).padStart(2, "0")}</small></Link>)}<Link className="menu-login" href={session ? "/account/bookings" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "การจองของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link></aside>
+    <aside className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}><button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={22} /></button><Link className="menu-logo" href="/" onClick={(e) => navigateToSection(e, "home")}>OneVent<span>One</span></Link>{menuItems.map(([name, href, sectionId], index) => <Link key={name} href={href} onClick={(e) => sectionId ? navigateToSection(e, sectionId) : setMenuOpen(false)}><span>{name}</span><small>{String(index + 1).padStart(2, "0")}</small></Link>)}<Link className="menu-login" href={session ? "/account/bookings" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "การจองของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link></aside>
     {menuOpen ? <button className="menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" /> : null}
   </header>;
 }

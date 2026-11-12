@@ -95,200 +95,210 @@ export function BookingPicker({ slug }: { slug: string }) {
   if (eventResource.loading) return <Loading />;
   if (eventResource.error)
     return (
-      <div className="container section">
-        <ErrorNotice error={eventResource.error} retry={eventResource.reload} />
+      <div className="mongkol-page customer-page">
+        <div className="mongkol-container section">
+          <ErrorNotice error={eventResource.error} retry={eventResource.reload} />
+        </div>
       </div>
     );
   if (!event) return null;
   return (
-    <div className="container section">
-      <Link href={`/events/${slug}`} className="text-link">
-        <ArrowLeft size={15} />
-        กลับไปดูอีเวนท์
-      </Link>
-      <div style={{ marginTop: 25 }}>
-        <PageHeading title="เลือกที่ของคุณ" description={event.title} />
-      </div>
-      <div className="booking-workspace">
-        <div className="stack">
-          <div className="notice">
-            การเลือกในหน้านี้ยังไม่พักสิทธิ์
-            ที่นั่งจะถูกกันไว้เมื่อสร้างการจองสำเร็จเท่านั้น
+    <div className="mongkol-page customer-page">
+      <div className="mongkol-container section">
+        <Link href={`/events/${slug}`} className="view-all-button customer-back-link">
+          <ArrowLeft size={17} />
+          <span>กลับไปดูรายละเอียดอีเวนต์</span>
+        </Link>
+        <div style={{ marginTop: 26 }}>
+          <div className="section-kicker" style={{ marginBottom: 8 }}>
+            <span /> INTERACTIVE FLOOR PLAN
           </div>
-          <div>
-            <div className="tabs" role="tablist" aria-label="โซน">
-              {event.zones?.map((zone) => (
-                <button
-                  key={zone.id}
-                  role="tab"
-                  aria-selected={activeZone === zone.id}
-                  onClick={() => setZoneId(zone.id)}
-                >
-                  {zone.name} · {modeText(zone.sellingMode)}
-                </button>
-              ))}
+          <PageHeading title="เลือกโต๊ะและที่นั่งของคุณ" description={event.title} />
+        </div>
+        <div className="booking-workspace">
+          <div className="stack">
+            <div className="notice">
+              การเลือกในหน้านี้ยังไม่พักสิทธิ์
+              ที่นั่งจะถูกกันไว้เมื่อสร้างการจองสำเร็จเท่านั้น
             </div>
-            {data?.layout ? (
-              <VenueView
-                layout={data.layout}
-                units={data.units}
-                selected={selected}
-                onSelect={toggle}
-              />
-            ) : null}
-            <div className="legend">
-              {["AVAILABLE", "HELD", "REVIEW_RESERVED", "SOLD", "BLOCKED"].map(
-                (status) => (
-                  <Status key={status} value={status} />
-                ),
-              )}
-            </div>
-            <ErrorNotice
-              error={availability.error}
-              retry={availability.reload}
-            />
-            {availability.loading ? (
-              <Loading />
-            ) : (
-              <>
-                <div className="between" style={{ margin: "24px 0 17px" }}>
-                  <h3>เลือกจากรายการ</h3>
-                  <button className="text-link" onClick={availability.reload}>
-                    <RefreshCw size={13} />
-                    อัปเดตที่ว่าง
+            <div className="customer-card">
+              <div className="tabs" role="tablist" aria-label="โซน">
+                {event.zones?.map((zone) => (
+                  <button
+                    key={zone.id}
+                    role="tab"
+                    aria-selected={activeZone === zone.id}
+                    onClick={() => setZoneId(zone.id)}
+                  >
+                    {zone.name} · {modeText(zone.sellingMode)}
                   </button>
-                </div>
-                <div className="unit-grid">
-                  {units.map((unit) => {
-                    const status =
-                      unit.status || unit.inventory?.status || "BLOCKED";
+                ))}
+              </div>
+              {data?.layout ? (
+                <VenueView
+                  layout={data.layout}
+                  units={data.units}
+                  selected={selected}
+                  onSelect={toggle}
+                />
+              ) : null}
+              <div className="legend">
+                {["AVAILABLE", "HELD", "REVIEW_RESERVED", "SOLD", "BLOCKED"].map(
+                  (status) => (
+                    <Status key={status} value={status} />
+                  ),
+                )}
+              </div>
+              <ErrorNotice
+                error={availability.error}
+                retry={availability.reload}
+              />
+              {availability.loading ? (
+                <Loading />
+              ) : (
+                <>
+                  <div className="between" style={{ margin: "24px 0 17px" }}>
+                    <h3>เลือกจากรายการ</h3>
+                    <button className="text-link" onClick={availability.reload}>
+                      <RefreshCw size={13} />
+                      อัปเดตที่ว่าง
+                    </button>
+                  </div>
+                  <div className="unit-grid">
+                    {units.map((unit) => {
+                      const status =
+                        unit.status || unit.inventory?.status || "BLOCKED";
+                      return (
+                        <button
+                          key={unit.id}
+                          className={`unit-choice ${selected.includes(unit.id) ? "selected" : ""}`}
+                          aria-pressed={selected.includes(unit.id)}
+                          disabled={status !== "AVAILABLE"}
+                          onClick={() => toggle(unit.id)}
+                        >
+                          <strong>{unit.code}</strong>
+                          <span>{money(unit.priceSatang)}</span>
+                          <small>{unit.admissionCount} สิทธิ์เข้า</small>
+                          <Status value={status} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {ticketTypes.map((type) => {
+                    const pool = data?.pools.find((p) => p.id === type.poolId);
                     return (
-                      <button
-                        key={unit.id}
-                        className={`unit-choice ${selected.includes(unit.id) ? "selected" : ""}`}
-                        aria-pressed={selected.includes(unit.id)}
-                        disabled={status !== "AVAILABLE"}
-                        onClick={() => toggle(unit.id)}
-                      >
-                        <strong>{unit.code}</strong>
-                        <span>{money(unit.priceSatang)}</span>
-                        <small>{unit.admissionCount} สิทธิ์เข้า</small>
-                        <Status value={status} />
-                      </button>
+                      <div className="ga-choice" key={type.id}>
+                        <div>
+                          <h3>{type.name}</h3>
+                          <p>
+                            {money(type.priceSatang)} / คน · คงเหลือร่วม{" "}
+                            {pool?.available ?? 0} สิทธิ์
+                          </p>
+                        </div>
+                        <label className="field">
+                          <span className="sr-only">จำนวน {type.name}</span>
+                          <select
+                            value={quantities[type.id] || 0}
+                            onChange={(e) =>
+                              setQuantities((q) => ({
+                                ...q,
+                                [type.id]: Number(e.target.value),
+                              }))
+                            }
+                          >
+                            {Array.from(
+                              { length: Math.min(20, pool?.available || 0) + 1 },
+                              (_, i) => (
+                                <option key={i} value={i}>
+                                  {i}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                      </div>
                     );
                   })}
-                </div>
-                {ticketTypes.map((type) => {
-                  const pool = data?.pools.find((p) => p.id === type.poolId);
-                  return (
-                    <div className="ga-choice" key={type.id}>
-                      <div>
-                        <h3>{type.name}</h3>
-                        <p>
-                          {money(type.priceSatang)} / คน · คงเหลือร่วม{" "}
-                          {pool?.available ?? 0} สิทธิ์
-                        </p>
-                      </div>
-                      <label className="field">
-                        <span className="sr-only">จำนวน {type.name}</span>
-                        <select
-                          value={quantities[type.id] || 0}
-                          onChange={(e) =>
-                            setQuantities((q) => ({
-                              ...q,
-                              [type.id]: Number(e.target.value),
-                            }))
-                          }
-                        >
-                          {Array.from(
-                            { length: Math.min(20, pool?.available || 0) + 1 },
-                            (_, i) => (
-                              <option key={i} value={i}>
-                                {i}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-                    </div>
-                  );
-                })}
-                {units.length === 0 && ticketTypes.length === 0 ? (
-                  <Empty title="โซนนี้ยังไม่มีหน่วยเปิดขาย" />
-                ) : null}
-              </>
-            )}
-          </div>
-        </div>
-        <aside className="panel sticky-panel">
-          <h2>การจองของคุณ</h2>
-          {selectedUnits.length || selectedTypes.length ? (
-            <ul className="summary-list">
-              {selectedUnits.map((u) => (
-                <li key={u.id}>
-                  <span>
-                    {u.name || u.code}
-                    <small>
-                      1 {modeText(u.sellingMode)} · {u.admissionCount} คน
-                    </small>
-                  </span>
-                  <strong>{money(u.priceSatang)}</strong>
-                </li>
-              ))}
-              {selectedTypes.map((t) => (
-                <li key={t.id}>
-                  <span>
-                    {t.name}
-                    <small>{quantities[t.id]} ใบ</small>
-                  </span>
-                  <strong>{money(t.priceSatang * quantities[t.id])}</strong>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted" style={{ fontSize: 13 }}>
-              เลือกโต๊ะ ที่นั่ง หรือบัตรจากรายการ
-            </p>
-          )}
-          <div className="summary-row">
-            <span className="muted">จำนวนสิทธิ์เข้า</span>
-            <strong>{admissions} คน</strong>
-          </div>
-          <div className="summary-row summary-total">
-            <div>
-              <span className="muted">ยอดประมาณจากราคาปัจจุบัน</span>
-              <br />
-              <small className="muted">ยอดยืนยันแสดงในขั้นตอนถัดไป</small>
+                  {units.length === 0 && ticketTypes.length === 0 ? (
+                    <Empty title="โซนนี้ยังไม่มีหน่วยเปิดขาย" />
+                  ) : null}
+                </>
+              )}
             </div>
-            <strong>{money(estimatedTotal)}</strong>
           </div>
-          <label className="check-label">
-            <input
-              type="checkbox"
-              checked={accepted}
-              onChange={(e) => setAccepted(e.target.checked)}
-            />
-            <span>
-              รับทราบเงื่อนไขการจอง และจะโอนเงินพร้อมส่งหลักฐานภายในเวลาที่กำหนด
-            </span>
-          </label>
-          <ErrorNotice error={error} />
-          <button
-            className="button button-wide"
-            style={{ marginTop: 16 }}
-            disabled={!accepted || admissions === 0 || pending}
-            onClick={book}
-          >
-            {pending ? "กำลังสร้างการจอง" : "ยืนยันและไปชำระเงิน"}
-            <ArrowRight size={17} />
-          </button>
-          {error && !(error instanceof ApiError) ? (
-            <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
-              การเชื่อมต่ออาจขัดข้อง
-              กดอีกครั้งด้วยรายการเดิมเพื่อตรวจผลเดิมอย่างปลอดภัย
-            </p>
-          ) : null}
-        </aside>
+          <aside className="panel sticky-panel customer-sticky-card">
+            <div className="section-kicker" style={{ marginBottom: 8 }}>
+              <span /> BOOKING SUMMARY
+            </div>
+            <h2>การจองของคุณ</h2>
+            {selectedUnits.length || selectedTypes.length ? (
+              <ul className="summary-list">
+                {selectedUnits.map((u) => (
+                  <li key={u.id}>
+                    <span>
+                      {u.name || u.code}
+                      <small>
+                        1 {modeText(u.sellingMode)} · {u.admissionCount} คน
+                      </small>
+                    </span>
+                    <strong>{money(u.priceSatang)}</strong>
+                  </li>
+                ))}
+                {selectedTypes.map((t) => (
+                  <li key={t.id}>
+                    <span>
+                      {t.name}
+                      <small>{quantities[t.id]} ใบ</small>
+                    </span>
+                    <strong>{money(t.priceSatang * quantities[t.id])}</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted" style={{ fontSize: 13 }}>
+                เลือกโต๊ะ ที่นั่ง หรือบัตรจากรายการ
+              </p>
+            )}
+            <div className="summary-row">
+              <span className="muted">จำนวนสิทธิ์เข้า</span>
+              <strong>{admissions} คน</strong>
+            </div>
+            <div className="summary-row summary-total">
+              <div>
+                <span className="muted">ยอดประมาณจากราคาปัจจุบัน</span>
+                <br />
+                <small className="muted">ยอดยืนยันแสดงในขั้นตอนถัดไป</small>
+              </div>
+              <strong>{money(estimatedTotal)}</strong>
+            </div>
+            <label className="check-label">
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)}
+              />
+              <span>
+                รับทราบเงื่อนไขการจอง และจะโอนเงินพร้อมส่งหลักฐานภายในเวลาที่กำหนด
+              </span>
+            </label>
+            <ErrorNotice error={error} />
+            <button
+              className="mongkol-button button-wide"
+              style={{ marginTop: 16 }}
+              disabled={!accepted || admissions === 0 || pending}
+              onClick={book}
+            >
+              {pending ? "กำลังสร้างการจอง" : "ยืนยันและไปชำระเงิน"}
+              <ArrowRight size={17} />
+            </button>
+            {error && !(error instanceof ApiError) ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+                การเชื่อมต่ออาจขัดข้อง
+                กดอีกครั้งด้วยรายการเดิมเพื่อตรวจผลเดิมอย่างปลอดภัย
+              </p>
+            ) : null}
+          </aside>
+        </div>
       </div>
     </div>
   );

@@ -9,8 +9,11 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   return (
-    <div className="auth-page">
-      <div className="auth-card">
+    <div className="mongkol-page customer-page auth-page">
+      <div className="auth-card customer-card">
+        <div className="section-kicker" style={{ marginBottom: 10 }}>
+          <span /> {signup ? "CREATE ACCOUNT" : "MEMBER ACCESS"}
+        </div>
         <h1>{signup ? "เริ่มต้นคืนพิเศษของคุณ" : "ยินดีต้อนรับกลับ"}</h1>
         <p>
           {signup
@@ -98,7 +101,7 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
           </Field>
           <ErrorNotice error={error} />
           <button
-            className="button button-wide"
+            className="mongkol-button button-wide"
             disabled={pending}
             type="submit"
           >

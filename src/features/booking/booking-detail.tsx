@@ -162,7 +162,7 @@ function PaymentForm({
             หลักฐานเป็นข้อมูลส่วนตัว
             เจ้าของรายการและผู้ดูแลที่มีสิทธิ์เท่านั้นที่เปิดดูได้
           </p>
-          <button type="submit" className="button" disabled={pending}>
+          <button type="submit" className="mongkol-button" disabled={pending}>
             <Upload size={17} />
             {pending ? "กำลังส่งหลักฐาน" : "ส่งหลักฐานให้ผู้ดูแลตรวจสอบ"}
           </button>
@@ -235,8 +235,10 @@ export function BookingDetail({
   if (resource.loading) return <Loading />;
   if (resource.error)
     return (
-      <div className="container section">
-        <ErrorNotice error={resource.error} retry={resource.reload} />
+      <div className="mongkol-page customer-page">
+        <div className="mongkol-container section">
+          <ErrorNotice error={resource.error} retry={resource.reload} />
+        </div>
       </div>
     );
   if (!booking) return null;
@@ -244,193 +246,204 @@ export function BookingDetail({
     booking.status,
   );
   return (
-    <div className="container section">
-      <Link href="/account/bookings" className="text-link">
-        <ArrowLeft size={15} />
-        การจองของฉัน
-      </Link>
-      <div style={{ marginTop: 25 }}>
-        <PageHeading
-          title={
-            checkout && canPay
-              ? "อีกขั้นเดียว ก่อนคืนพิเศษ"
-              : "รายละเอียดการจอง"
-          }
-          description={`เลขการจอง ${booking.bookingNumber}`}
-          action={<Status value={booking.status} />}
-        />
-      </div>
-      <div className="checkout-layout">
-        <div className="stack">
-          {booking.status === "PENDING_PAYMENT" ? (
-            <HoldTimer
-              expiry={booking.holdExpiresAt}
-              serverNow={booking.serverNow}
-              onElapsed={resource.reload}
-            />
-          ) : null}
-          {["PENDING_REVIEW", "ACTION_REQUIRED"].includes(booking.status) ? (
-            <div className="notice">
-              <Clock3 size={20} />
-              <div>
+    <div className="mongkol-page customer-page">
+      <div className="mongkol-container section">
+        <Link href="/account/bookings" className="view-all-button customer-back-link">
+          <ArrowLeft size={17} />
+          <span>กลับไปการจองของฉัน</span>
+        </Link>
+        <div style={{ marginTop: 26 }}>
+          <div className="section-kicker" style={{ marginBottom: 8 }}>
+            <span /> {checkout && canPay ? "CHECKOUT & PAYMENT" : "BOOKING PASS"}
+          </div>
+          <PageHeading
+            title={
+              checkout && canPay
+                ? "อีกขั้นเดียว ก่อนคืนพิเศษ"
+                : "รายละเอียดการจอง"
+            }
+            description={`เลขการจอง ${booking.bookingNumber}`}
+            action={<Status value={booking.status} />}
+          />
+        </div>
+        <div className="checkout-layout">
+          <div className="stack">
+            {booking.status === "PENDING_PAYMENT" ? (
+              <HoldTimer
+                expiry={booking.holdExpiresAt}
+                serverNow={booking.serverNow}
+                onElapsed={resource.reload}
+              />
+            ) : null}
+            {["PENDING_REVIEW", "ACTION_REQUIRED"].includes(booking.status) ? (
+              <div className="notice">
+                <Clock3 size={20} />
+                <div>
+                  <p>
+                    {booking.status === "PENDING_REVIEW"
+                      ? "ส่งหลักฐานแล้ว รอผู้ดูแลตรวจสอบ"
+                      : "กรุณาแก้ไขหลักฐานตามคำแนะนำของผู้ดูแล"}
+                  </p>
+                  <p>
+                    ระบบคงสิทธิ์ของคุณระหว่างตรวจสอบ จะออกบัตรหลังผู้ดูแลอนุมัติ
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {booking.reason ? (
+              <div className="notice">
+                <p>ข้อความจากผู้ดูแล: {booking.reason}</p>
+              </div>
+            ) : null}
+            {booking.status === "CONFIRMED" ? (
+              <div className="notice success-notice">
+                <CheckCircle2 size={20} />
+                <p>ยืนยันการจองแล้ว เตรียม QR สำหรับเข้างานได้ด้านล่าง</p>
+              </div>
+            ) : null}
+            {["EXPIRED", "REJECTED", "CANCELLED"].includes(booking.status) ? (
+              <div className="notice">
                 <p>
-                  {booking.status === "PENDING_REVIEW"
-                    ? "ส่งหลักฐานแล้ว รอผู้ดูแลตรวจสอบ"
-                    : "กรุณาแก้ไขหลักฐานตามคำแนะนำของผู้ดูแล"}
-                </p>
-                <p>
-                  ระบบคงสิทธิ์ของคุณระหว่างตรวจสอบ จะออกบัตรหลังผู้ดูแลอนุมัติ
+                  รายการนี้ไม่สามารถส่งหลักฐานเพิ่มเติมได้ หากโอนเงินแล้ว
+                  กรุณาติดต่อผู้ดูแลพร้อมเลขการจองเพื่อให้ตรวจสอบ
                 </p>
               </div>
-            </div>
-          ) : null}
-          {booking.reason ? (
-            <div className="notice">
-              <p>ข้อความจากผู้ดูแล: {booking.reason}</p>
-            </div>
-          ) : null}
-          {booking.status === "CONFIRMED" ? (
-            <div className="notice success-notice">
-              <CheckCircle2 size={20} />
-              <p>ยืนยันการจองแล้ว เตรียม QR สำหรับเข้างานได้ด้านล่าง</p>
-            </div>
-          ) : null}
-          {["EXPIRED", "REJECTED", "CANCELLED"].includes(booking.status) ? (
-            <div className="notice">
-              <p>
-                รายการนี้ไม่สามารถส่งหลักฐานเพิ่มเติมได้ หากโอนเงินแล้ว
-                กรุณาติดต่อผู้ดูแลพร้อมเลขการจองเพื่อให้ตรวจสอบ
-              </p>
-            </div>
-          ) : null}
-          {canPay ? (
-            <>
-              <section className="panel">
-                <h2>ช่องทางโอนเงิน</h2>
-                <ErrorNotice error={business.error} retry={business.reload} />
-                {business.loading && !booking.snapshot?.paymentInstructions ? (
-                  <Loading />
-                ) : null}
-                {booking.snapshot?.paymentInstructions || business.data ? (
-                  <>
-                    <JsonFacts
-                      value={
-                        booking.snapshot?.paymentInstructions ||
-                        business.data?.paymentInstructions
-                      }
-                    />
-                    <div className="summary-row summary-total">
-                      <span>ยอดชำระเต็มจำนวน</span>
-                      <strong>{money(booking.totalSatang)}</strong>
-                    </div>
-                  </>
-                ) : null}
-              </section>
-              <PaymentForm booking={booking} reload={resource.reload} />
-            </>
-          ) : null}
-          {booking.status === "CONFIRMED" ? (
-            <Tickets bookingId={booking.id} />
-          ) : null}
-          {booking.payments?.length ? (
-            <section className="panel">
-              <h2>ประวัติหลักฐาน</h2>
-              <ul className="history-list">
-                {booking.payments.map((payment, index) => (
-                  <li key={payment.id}>
-                    <div className="between">
-                      <strong>หลักฐาน #{index + 1}</strong>
-                      <Status value={payment.status} />
-                    </div>
-                    <p>
-                      ยอดแจ้ง {money(payment.declaredAmountSatang)} ·{" "}
-                      {dateTime(payment.transferTime)}
-                    </p>
-                    {payment.reviewReason ? (
-                      <p>{payment.reviewReason}</p>
-                    ) : null}
-                    <a
-                      className="text-link"
-                      href={`/api/private-assets/${payment.assetId}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      เปิดหลักฐาน
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-          {booking.refunds?.length ? (
-            <section className="panel">
-              <h2>การคืนเงิน</h2>
-              <p className="muted">
-                ผู้ดูแลดำเนินการคืนเงินภายนอกและบันทึกผลในระบบ
-              </p>
-              {booking.refunds.map((refund) => (
-                <div className="price-row" key={refund.id}>
-                  <div>
-                    <Status value={refund.status} />
-                    <small>{refund.reason}</small>
+            ) : null}
+            {canPay ? (
+              <>
+                <section className="panel customer-card">
+                  <div className="section-kicker" style={{ marginBottom: 8 }}>
+                    <span /> BANK TRANSFER
                   </div>
-                  <strong>{money(refund.amountSatang)}</strong>
-                </div>
-              ))}
-            </section>
-          ) : null}
-        </div>
-        <aside className="panel sticky-panel">
-          <h2>{booking.event?.title || "สรุปการจอง"}</h2>
-          {booking.event?.startsAt ? (
-            <p className="muted">{dateTime(booking.event.startsAt)}</p>
-          ) : null}
-          <ul className="summary-list">
-            {booking.items.map((item) => (
-              <li key={item.id}>
-                <span>
-                  {String(
-                    item.snapshot.unitName ||
-                      item.snapshot.ticketTypeName ||
-                      item.snapshot.unitCode ||
-                      item.snapshot.zoneName ||
-                      "บัตรเข้าชม",
-                  )}
-                  <small>
-                    {item.quantity} รายการ · {item.admissionCount} สิทธิ์เข้า
-                  </small>
-                </span>
-                <strong>{money(item.subtotalSatang)}</strong>
-              </li>
-            ))}
-          </ul>
-          <div className="summary-row summary-total">
-            <span>ยอดรวม</span>
-            <strong>{money(booking.totalSatang)}</strong>
+                  <h2>ช่องทางโอนเงิน</h2>
+                  <ErrorNotice error={business.error} retry={business.reload} />
+                  {business.loading && !booking.snapshot?.paymentInstructions ? (
+                    <Loading />
+                  ) : null}
+                  {booking.snapshot?.paymentInstructions || business.data ? (
+                    <>
+                      <JsonFacts
+                        value={
+                          booking.snapshot?.paymentInstructions ||
+                          business.data?.paymentInstructions
+                        }
+                      />
+                      <div className="summary-row summary-total">
+                        <span>ยอดชำระเต็มจำนวน</span>
+                        <strong>{money(booking.totalSatang)}</strong>
+                      </div>
+                    </>
+                  ) : null}
+                </section>
+                <PaymentForm booking={booking} reload={resource.reload} />
+              </>
+            ) : null}
+            {booking.status === "CONFIRMED" ? (
+              <Tickets bookingId={booking.id} />
+            ) : null}
+            {booking.payments?.length ? (
+              <section className="panel customer-card">
+                <h2>ประวัติหลักฐาน</h2>
+                <ul className="history-list">
+                  {booking.payments.map((payment, index) => (
+                    <li key={payment.id}>
+                      <div className="between">
+                        <strong>หลักฐาน #{index + 1}</strong>
+                        <Status value={payment.status} />
+                      </div>
+                      <p>
+                        ยอดแจ้ง {money(payment.declaredAmountSatang)} ·{" "}
+                        {dateTime(payment.transferTime)}
+                      </p>
+                      {payment.reviewReason ? (
+                        <p>{payment.reviewReason}</p>
+                      ) : null}
+                      <a
+                        className="text-link"
+                        href={`/api/private-assets/${payment.assetId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        เปิดหลักฐาน
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {booking.refunds?.length ? (
+              <section className="panel customer-card">
+                <h2>การคืนเงิน</h2>
+                <p className="muted">
+                  ผู้ดูแลดำเนินการคืนเงินภายนอกและบันทึกผลในระบบ
+                </p>
+                {booking.refunds.map((refund) => (
+                  <div className="price-row" key={refund.id}>
+                    <div>
+                      <Status value={refund.status} />
+                      <small>{refund.reason}</small>
+                    </div>
+                    <strong>{money(refund.amountSatang)}</strong>
+                  </div>
+                ))}
+              </section>
+            ) : null}
           </div>
-          {booking.status === "PENDING_PAYMENT" ? (
-            <>
-              <ErrorNotice error={cancel.error} />
-              <button
-                className="text-link"
-                disabled={cancel.pending}
-                onClick={async () => {
-                  if (!window.confirm("ยกเลิกการจองนี้และคืนสิทธิ์ที่พักไว้?"))
-                    return;
-                  try {
-                    await cancel.run(`/api/bookings/${booking.id}/cancel`, {
-                      version: booking.version,
-                      reason: "ลูกค้ายกเลิกการจองก่อนชำระเงิน",
-                    });
-                    await resource.reload();
-                  } catch {}
-                }}
-              >
-                ยกเลิกการจองนี้
-              </button>
-            </>
-          ) : null}
-        </aside>
+          <aside className="panel sticky-panel customer-sticky-card">
+            <div className="section-kicker" style={{ marginBottom: 8 }}>
+              <span /> ORDER ITEMS
+            </div>
+            <h2>{booking.event?.title || "สรุปการจอง"}</h2>
+            {booking.event?.startsAt ? (
+              <p className="muted">{dateTime(booking.event.startsAt)}</p>
+            ) : null}
+            <ul className="summary-list">
+              {booking.items.map((item) => (
+                <li key={item.id}>
+                  <span>
+                    {String(
+                      item.snapshot.unitName ||
+                        item.snapshot.ticketTypeName ||
+                        item.snapshot.unitCode ||
+                        item.snapshot.zoneName ||
+                        "บัตรเข้าชม",
+                    )}
+                    <small>
+                      {item.quantity} รายการ · {item.admissionCount} สิทธิ์เข้า
+                    </small>
+                  </span>
+                  <strong>{money(item.subtotalSatang)}</strong>
+                </li>
+              ))}
+            </ul>
+            <div className="summary-row summary-total">
+              <span>ยอดรวม</span>
+              <strong>{money(booking.totalSatang)}</strong>
+            </div>
+            {booking.status === "PENDING_PAYMENT" ? (
+              <>
+                <ErrorNotice error={cancel.error} />
+                <button
+                  className="text-link"
+                  disabled={cancel.pending}
+                  onClick={async () => {
+                    if (!window.confirm("ยกเลิกการจองนี้และคืนสิทธิ์ที่พักไว้?"))
+                      return;
+                    try {
+                      await cancel.run(`/api/bookings/${booking.id}/cancel`, {
+                        version: booking.version,
+                        reason: "ลูกค้ายกเลิกการจองก่อนชำระเงิน",
+                      });
+                      await resource.reload();
+                    } catch {}
+                  }}
+                >
+                  ยกเลิกการจองนี้
+                </button>
+              </>
+            ) : null}
+          </aside>
+        </div>
       </div>
     </div>
   );

@@ -34,6 +34,46 @@ export function Home({ events, venueName }: Props) {
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    function scrollToTargetSection() {
+      let target = "";
+      try {
+        target = window.sessionStorage.getItem("oneventone_scroll_target") || "";
+        if (target) {
+          window.sessionStorage.removeItem("oneventone_scroll_target");
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      if (!target && window.location.hash) {
+        target = window.location.hash.replace(/^#/, "");
+      }
+      if (!target) return;
+
+      const performScroll = () => {
+        if (target === "home") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        const element = document.getElementById(target);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      };
+
+      requestAnimationFrame(performScroll);
+      const timer = window.setTimeout(performScroll, 120);
+      return () => window.clearTimeout(timer);
+    }
+
+    const cleanup = scrollToTargetSection();
+    window.addEventListener("hashchange", scrollToTargetSection);
+    return () => {
+      cleanup?.();
+      window.removeEventListener("hashchange", scrollToTargetSection);
+    };
+  }, []);
+
   const hero = [
     ["OneVentOne", "NIGHTLIFE · LIVE EVENT · VIP TABLE", "คืนที่ใช่ เริ่มต้นที่นี่", "จองบัตรเข้างานและเลือกโต๊ะ VIP ล่วงหน้าได้ทันที"],
     ["RED ROOM NIGHTS", "LIVE MUSIC · DJ LINEUP · EXCLUSIVE", "ปล่อยใจไปกับจังหวะ", "พบกับศิลปินและดีเจชั้นนำทุกสุดสัปดาห์"],
@@ -78,9 +118,9 @@ export function Home({ events, venueName }: Props) {
             <a href="#events" className="mongkol-button">
               <Ticket size={18} /> จองบัตรเลย
             </a>
-            <a href="#events" className="hero-more">
+            <Link href="/events" className="view-all-button hero-more">
               ดูตารางอีเวนต์ <ArrowRight size={17} />
-            </a>
+            </Link>
           </div>
           <div className="hero-pager">
             {[0, 1, 2].map((item) => (

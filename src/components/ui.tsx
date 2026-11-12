@@ -180,6 +180,10 @@ export function EventCard({ event }: { event: EventData }) {
   })
     .format(startsAt)
     .toUpperCase();
+  const year = new Intl.DateTimeFormat("en-GB", {
+    year: "numeric",
+    timeZone: "Asia/Bangkok",
+  }).format(startsAt);
   const modes = [...new Set(event.zones?.map((zone) => zone.sellingMode))];
   const detailsHref = event.slug ? `/events/${event.slug}` : "/events";
   const isPublished = event.status === "PUBLISHED";
@@ -203,7 +207,9 @@ export function EventCard({ event }: { event: EventData }) {
           aria-label={dateTime(event.startsAt)}
         >
           <strong>{day}</strong>
-          <span>{month}</span>
+          <span>
+            {month} {year}
+          </span>
         </time>
         <span className={`event-card-badge ${isPublished ? "is-live" : ""}`}>
           <span className="event-card-badge-dot" aria-hidden="true" />
