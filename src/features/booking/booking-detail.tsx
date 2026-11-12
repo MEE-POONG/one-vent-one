@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   Upload,
   CheckCircle2,
   Ticket as TicketIcon,
+  ScanLine,
 } from "lucide-react";
 import { useMutation, useResource } from "@/lib/client-api";
 import type { Booking, Business, Ticket } from "@/lib/client-types";
@@ -27,10 +28,12 @@ function HoldTimer({
   expiry,
   serverNow,
   onElapsed,
+  demo = false,
 }: {
   expiry: string;
   serverNow: string;
   onElapsed: () => void;
+  demo?: boolean;
 }) {
   const [remaining, setRemaining] = useState(
     Math.max(0, Date.parse(expiry) - Date.parse(serverNow)),
@@ -57,14 +60,123 @@ function HoldTimer({
       <div className="actions">
         <Clock3 size={20} />
         <span>
-          {remaining > 0 ? "ส่งหลักฐานภายใน" : "กำลังตรวจสถานะล่าสุด"}
+          {remaining > 0
+            ? demo
+              ? "ชำระเงินภายใน"
+              : "ส่งหลักฐานภายใน"
+            : "หมดเวลาชำระเงิน"}
         </span>
       </div>
       <strong>
-        {`${Math.floor(remaining / 60000)}`.padStart(2, "0")}:
-        {`${Math.floor(remaining / 1000) % 60}`.padStart(2, "0")}
+        {`${Math.floor(Math.ceil(remaining / 1000) / 60)}`.padStart(2, "0")}:
+        {`${Math.ceil(remaining / 1000) % 60}`.padStart(2, "0")}
       </strong>
     </div>
+  );
+}
+function DemoPayment({
+  booking,
+  reload,
+}: {
+  booking: Booking;
+  reload: () => Promise<void>;
+}) {
+  const payment = useMutation();
+  const [expired, setExpired] = useState(
+    Date.parse(booking.holdExpiresAt) <= Date.parse(booking.serverNow),
+  );
+  const [paid, setPaid] = useState(false);
+  const onElapsed = useCallback(() => {
+    setExpired(true);
+    void reload();
+  }, [reload]);
+  return (
+    <section className="panel customer-card demo-payment">
+      <div className="between">
+        <div className="section-kicker">
+          <span /> QR PAYMENT
+        </div>
+        <span className="demo-payment-badge">DEMO</span>
+      </div>
+      <h2>สแกน QR เพื่อชำระเงิน</h2>
+      <p className="muted">
+        QR สำหรับรายการนี้สร้างให้อัตโนมัติ และมีอายุ 5 นาที
+      </p>
+      <HoldTimer
+        expiry={booking.holdExpiresAt}
+        serverNow={booking.serverNow}
+        onElapsed={onElapsed}
+        demo
+      />
+      <div className="demo-payment-body">
+        {!expired && !paid ? (
+          <div className="demo-payment-qr">
+            <QRCodeSVG
+              value={JSON.stringify({
+                type: "ONEVENTONE_DEMO_PAYMENT",
+                booking: booking.bookingNumber,
+                amountSatang: booking.totalSatang,
+                expiresAt: booking.holdExpiresAt,
+              })}
+              size={224}
+              marginSize={4}
+              level="M"
+              title="QR ชำระเงินเดโม ไม่มีการรับเงินจริง"
+            />
+          </div>
+        ) : (
+          <div className="demo-payment-ended" role="status">
+            {paid ? <CheckCircle2 size={40} /> : <Clock3 size={40} />}
+            <h3>{paid ? "ชำระเงินเดโมสำเร็จ" : "QR หมดอายุแล้ว"}</h3>
+            <p>
+              {paid
+                ? "กำลังโหลดบัตรเข้างานของคุณ"
+                : "กรุณาเลือกที่นั่งและสร้างรายการจองใหม่"}
+            </p>
+          </div>
+        )}
+        <p className="muted">ยอดชำระเต็มจำนวน</p>
+        <strong className="demo-payment-amount">
+          {money(booking.totalSatang)}
+        </strong>
+        <small className="muted">{booking.bookingNumber}</small>
+      </div>
+      <div className="notice">
+        <ScanLine size={22} />
+        <p>
+          โหมดทดสอบ — QR นี้ไม่สามารถใช้โอนเงินจริงได้
+          กดปุ่มด้านล่างเพื่อจำลองการชำระสำเร็จ
+          ระบบจะยืนยันการจองและออกบัตรให้อัตโนมัติ
+        </p>
+      </div>
+      <ErrorNotice error={payment.error} />
+      {expired ? (
+        <Link className="mongkol-button" href={`/events/${booking.event.slug}`}>
+          เลือกที่นั่งใหม่
+        </Link>
+      ) : (
+        <button
+          className="mongkol-button"
+          disabled={payment.pending || paid}
+          onClick={async () => {
+            try {
+              await payment.run(`/api/bookings/${booking.id}/demo-payment`, {});
+              setPaid(true);
+              await reload();
+            } catch {
+              await reload();
+            }
+          }}
+        >
+          <CheckCircle2 size={18} />
+          {payment.pending
+            ? "กำลังยืนยันการชำระเงิน…"
+            : paid
+              ? "ชำระเงินเดโมสำเร็จ"
+              : "ยืนยันว่าชำระแล้ว (ทดสอบ)"}
+        </button>
+      )}
+    </section>
   );
 }
 function PaymentForm({
@@ -242,19 +354,24 @@ export function BookingDetail({
       </div>
     );
   if (!booking) return null;
+  const isDemo = booking.snapshot?.paymentMode === "DEMO_QR";
   const canPay = ["PENDING_PAYMENT", "ACTION_REQUIRED"].includes(
     booking.status,
   );
   return (
     <div className="mongkol-page customer-page">
       <div className="mongkol-container section">
-        <Link href="/account/bookings" className="view-all-button customer-back-link">
+        <Link
+          href="/account/bookings"
+          className="view-all-button customer-back-link"
+        >
           <ArrowLeft size={17} />
           <span>กลับไปการจองของฉัน</span>
         </Link>
         <div style={{ marginTop: 26 }}>
           <div className="section-kicker" style={{ marginBottom: 8 }}>
-            <span /> {checkout && canPay ? "CHECKOUT & PAYMENT" : "BOOKING PASS"}
+            <span />{" "}
+            {checkout && canPay ? "CHECKOUT & PAYMENT" : "BOOKING PASS"}
           </div>
           <PageHeading
             title={
@@ -268,7 +385,7 @@ export function BookingDetail({
         </div>
         <div className="checkout-layout">
           <div className="stack">
-            {booking.status === "PENDING_PAYMENT" ? (
+            {booking.status === "PENDING_PAYMENT" && !isDemo ? (
               <HoldTimer
                 expiry={booking.holdExpiresAt}
                 serverNow={booking.serverNow}
@@ -298,18 +415,33 @@ export function BookingDetail({
             {booking.status === "CONFIRMED" ? (
               <div className="notice success-notice">
                 <CheckCircle2 size={20} />
-                <p>ยืนยันการจองแล้ว เตรียม QR สำหรับเข้างานได้ด้านล่าง</p>
+                <p>
+                  {isDemo
+                    ? "ชำระเงินเดโมสำเร็จ ระบบยืนยันการจองและออกบัตรให้อัตโนมัติแล้ว (ไม่มีการรับเงินจริง)"
+                    : "ยืนยันการจองแล้ว เตรียม QR สำหรับเข้างานได้ด้านล่าง"}
+                </p>
               </div>
             ) : null}
             {["EXPIRED", "REJECTED", "CANCELLED"].includes(booking.status) ? (
               <div className="notice">
                 <p>
-                  รายการนี้ไม่สามารถส่งหลักฐานเพิ่มเติมได้ หากโอนเงินแล้ว
-                  กรุณาติดต่อผู้ดูแลพร้อมเลขการจองเพื่อให้ตรวจสอบ
+                  {isDemo
+                    ? "รายการนี้สิ้นสุดแล้ว QR ไม่สามารถใช้ได้ กรุณาสร้างรายการจองใหม่เพื่อทดสอบชำระเงิน"
+                    : "รายการนี้ไม่สามารถส่งหลักฐานเพิ่มเติมได้ หากโอนเงินแล้ว กรุณาติดต่อผู้ดูแลพร้อมเลขการจองเพื่อให้ตรวจสอบ"}
                 </p>
+                {isDemo ? (
+                  <Link
+                    className="text-link"
+                    href={`/events/${booking.event.slug}`}
+                  >
+                    จองใหม่
+                  </Link>
+                ) : null}
               </div>
             ) : null}
-            {canPay ? (
+            {canPay && isDemo ? (
+              <DemoPayment booking={booking} reload={resource.reload} />
+            ) : canPay ? (
               <>
                 <section className="panel customer-card">
                   <div className="section-kicker" style={{ marginBottom: 8 }}>
@@ -317,7 +449,8 @@ export function BookingDetail({
                   </div>
                   <h2>ช่องทางโอนเงิน</h2>
                   <ErrorNotice error={business.error} retry={business.reload} />
-                  {business.loading && !booking.snapshot?.paymentInstructions ? (
+                  {business.loading &&
+                  !booking.snapshot?.paymentInstructions ? (
                     <Loading />
                   ) : null}
                   {booking.snapshot?.paymentInstructions || business.data ? (
@@ -427,7 +560,9 @@ export function BookingDetail({
                   className="text-link"
                   disabled={cancel.pending}
                   onClick={async () => {
-                    if (!window.confirm("ยกเลิกการจองนี้และคืนสิทธิ์ที่พักไว้?"))
+                    if (
+                      !window.confirm("ยกเลิกการจองนี้และคืนสิทธิ์ที่พักไว้?")
+                    )
                       return;
                     try {
                       await cancel.run(`/api/bookings/${booking.id}/cancel`, {

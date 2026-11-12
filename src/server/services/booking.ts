@@ -53,10 +53,7 @@ export async function ownedBooking(
     include: { items: true },
   });
   if (!booking) throw notFound();
-  if (
-    booking.userId !== actor.id &&
-    !(staffAllowed && hasRole(actor, "ADMIN"))
-  )
+  if (booking.userId !== actor.id && !(staffAllowed && hasRole(actor, "ADMIN")))
     throw new DomainError("FORBIDDEN", "คุณไม่มีสิทธิ์เข้าถึงรายการนี้", 403);
   return booking;
 }
@@ -227,9 +224,7 @@ export async function createBooking(
       "รายการจองเกินจำนวนหรือวงเงินที่อนุญาต",
       422,
     );
-    const holdExpiresAt = new Date(
-      now.getTime() + business.holdMinutes * 60_000,
-    );
+    const holdExpiresAt = new Date(now.getTime() + 5 * 60_000);
     const booking = await tx.booking.create({
       data: {
         bookingNumber: `OVO-${randomBytes(7).toString("hex").toUpperCase()}`,
@@ -240,6 +235,7 @@ export async function createBooking(
         holdExpiresAt,
         layoutVersionId: event.publishedLayoutVersionId,
         snapshot: {
+          paymentMode: "DEMO_QR",
           eventTitle: event.title,
           venue: event.venue,
           startsAt: event.startsAt.toISOString(),

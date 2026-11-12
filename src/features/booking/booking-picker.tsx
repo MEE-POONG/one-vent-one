@@ -278,7 +278,7 @@ export function BookingPicker({ slug }: { slug: string }) {
                 onChange={(e) => setAccepted(e.target.checked)}
               />
               <span>
-                รับทราบเงื่อนไขการจอง และจะโอนเงินพร้อมส่งหลักฐานภายในเวลาที่กำหนด
+                รับทราบเงื่อนไขการจอง และจะทดสอบชำระเงินผ่าน QR ภายใน 5 นาที (เดโม ไม่มีการรับเงินจริง)
               </span>
             </label>
             <ErrorNotice error={error} />

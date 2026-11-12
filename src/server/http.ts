@@ -66,10 +66,20 @@ export function api<T>(
         );
       else {
         // Never log inputs, database error payloads, sessions, credentials or evidence.
-        console.error("Request failed", {
-          requestId,
-          kind: error instanceof Error ? error.name : "UnknownError",
-        });
+        console.error(
+          "Request failed",
+          JSON.stringify({
+            requestId,
+            kind: error instanceof Error ? error.name : "UnknownError",
+            code:
+              typeof error === "object" &&
+              error !== null &&
+              "code" in error &&
+              /^P\d{4}$/.test(String(error.code))
+                ? error.code
+                : undefined,
+          }),
+        );
         safe = new DomainError(
           "SERVICE_UNAVAILABLE",
           "ระบบยังไม่พร้อม กรุณาลองใหม่อีกครั้ง",

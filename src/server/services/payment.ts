@@ -12,6 +12,85 @@ import { idempotent } from "./idempotency";
 import { moveInventory } from "./inventory";
 import { issueTickets } from "./ticket";
 
+/** Simulate a provider success for demo bookings only; never record real revenue. */
+export async function confirmDemoPayment(
+  actor: Actor,
+  id: string,
+  key: string,
+) {
+  return idempotent(actor.id, `payment.demo:${id}`, key, {}, async (tx) => {
+    const booking = await ownedBooking(tx, actor, id);
+    const snapshot = booking.snapshot as { paymentMode?: string };
+    invariant(
+      snapshot.paymentMode === "DEMO_QR",
+      "INVALID_TRANSITION",
+      "รายการนี้ไม่ใช่การชำระเงินเดโม",
+    );
+    // A retry with a new request key must not issue another set of tickets.
+    if (booking.status === "CONFIRMED") return bookingResult(tx, id);
+    invariant(
+      booking.status !== "EXPIRED" && booking.holdExpiresAt > new Date(),
+      "HOLD_EXPIRED",
+      "QR หมดอายุแล้ว กรุณาจองใหม่",
+    );
+    invariant(
+      booking.status === "PENDING_PAYMENT",
+      "INVALID_TRANSITION",
+      "รายการนี้ไม่สามารถชำระเงินได้",
+    );
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: booking.eventId },
+    });
+    invariant(
+      ["PUBLISHED", "CLOSED"].includes(event.status) &&
+        event.endsAt > new Date(),
+      "INVALID_TRANSITION",
+      "งานนี้ไม่อยู่ในสถานะที่ออกบัตรได้",
+    );
+    const fence = await tx.event.updateMany({
+      where: { id: event.id, version: event.version, status: event.status },
+      data: { version: { increment: 1 } },
+    });
+    invariant(
+      fence.count === 1,
+      "CONFLICT",
+      "สถานะงานเปลี่ยนแปลง กรุณาลองใหม่",
+    );
+    const now = new Date();
+    const changed = await tx.booking.updateMany({
+      where: {
+        id,
+        version: booking.version,
+        status: "PENDING_PAYMENT",
+        holdExpiresAt: { gt: now },
+      },
+      data: {
+        status: "CONFIRMED",
+        confirmedAt: now,
+        version: { increment: 1 },
+      },
+    });
+    invariant(
+      changed.count === 1,
+      "HOLD_EXPIRED",
+      "QR หมดอายุหรือสถานะรายการเปลี่ยนแปลง กรุณาโหลดใหม่",
+    );
+    await moveInventory(tx, booking, "HELD", "SOLD");
+    await issueTickets(tx, id);
+    await tx.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: "DEMO_PAYMENT_CONFIRMED",
+        entity: "Booking",
+        entityId: id,
+        reason: "จำลองชำระเงินสำเร็จ ไม่มีการรับเงินจริง",
+        changes: { simulatedAmountSatang: booking.totalSatang },
+      },
+    });
+    return bookingResult(tx, id);
+  });
+}
+
 export async function submitPayment(
   actor: Actor,
   id: string,

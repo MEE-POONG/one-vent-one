@@ -35,6 +35,7 @@ test(
       approveBooking,
       requestCorrection,
       recordLateReceipt,
+      confirmDemoPayment,
     } = await import("../src/server/services/payment");
     const { getTickets } = await import("../src/server/services/ticket");
     const { checkIn } = await import("../src/server/services/checkin");
@@ -254,6 +255,139 @@ test(
         commandKey,
       );
     }
+
+    await t.test(
+      "demo QR confirms once, issues tickets and does not record real revenue",
+      async () => {
+        const f = await fixture();
+        const before = Date.now();
+        const booking = await createBooking(
+          customer,
+          {
+            eventId: f.event.id,
+            items: [
+              { unitId: f.table.id, quantity: 1 },
+              { ticketTypeId: f.types[0].id, quantity: 2 },
+            ],
+          },
+          key(),
+        );
+        const expiry = new Date(booking.holdExpiresAt).getTime();
+        assert.ok(expiry >= before + 300_000 && expiry <= Date.now() + 300_000);
+        await assert.rejects(
+          confirmDemoPayment(other, booking.id, key()),
+          isError("FORBIDDEN"),
+        );
+        const commandKey = key();
+        const results = await Promise.all([
+          confirmDemoPayment(customer, booking.id, commandKey),
+          confirmDemoPayment(customer, booking.id, commandKey),
+          confirmDemoPayment(customer, booking.id, key()),
+        ]);
+        assert.ok(results.every((result) => result.status === "CONFIRMED"));
+        assert.equal(results[0].verifiedAmountSatang, 0);
+        assert.equal(results[0].payments.length, 0);
+        assert.equal(
+          (await getTickets(customer, booking.id)).tickets.length,
+          6,
+        );
+        assert.equal(
+          (
+            await prisma.capacityPool.findUniqueOrThrow({
+              where: { id: f.pool.id },
+            })
+          ).sold,
+          2,
+        );
+        assert.equal(
+          (
+            await prisma.unitInventory.findUniqueOrThrow({
+              where: {
+                eventId_unitId: { eventId: f.event.id, unitId: f.table.id },
+              },
+            })
+          ).status,
+          "SOLD",
+        );
+        assert.equal(
+          await prisma.auditLog.count({
+            where: { entityId: booking.id, action: "DEMO_PAYMENT_CONFIRMED" },
+          }),
+          1,
+        );
+      },
+    );
+
+    await t.test(
+      "demo QR rejects expired, cancelled, legacy bookings and cancelled events",
+      async () => {
+        for (const scenario of [
+          "expired",
+          "cancelled",
+          "legacy",
+          "event",
+        ] as const) {
+          const f = await fixture();
+          const booking = await createBooking(
+            customer,
+            {
+              eventId: f.event.id,
+              items: [{ unitId: f.table.id, quantity: 1 }],
+            },
+            key(),
+          );
+          if (scenario === "expired")
+            await prisma.booking.update({
+              where: { id: booking.id },
+              data: { holdExpiresAt: new Date(Date.now() - 1) },
+            });
+          if (scenario === "cancelled")
+            await cancelBooking(
+              customer,
+              booking.id,
+              { version: booking.version, reason: "Cancel demo" },
+              key(),
+            );
+          if (scenario === "legacy")
+            await prisma.booking.update({
+              where: { id: booking.id },
+              data: { snapshot: {} },
+            });
+          if (scenario === "event")
+            await prisma.event.update({
+              where: { id: f.event.id },
+              data: { status: "CANCELLED" },
+            });
+          await assert.rejects(
+            confirmDemoPayment(customer, booking.id, key()),
+            isError(
+              scenario === "expired" ? "HOLD_EXPIRED" : "INVALID_TRANSITION",
+            ),
+          );
+          assert.equal(
+            await prisma.ticket.count({ where: { bookingId: booking.id } }),
+            0,
+          );
+          if (scenario === "expired") {
+            await expireUnpaidHolds(f.event.id);
+            assert.equal(
+              (await getBooking(customer, booking.id)).status,
+              "EXPIRED",
+            );
+            assert.equal(
+              (
+                await prisma.unitInventory.findUniqueOrThrow({
+                  where: {
+                    eventId_unitId: { eventId: f.event.id, unitId: f.table.id },
+                  },
+                })
+              ).status,
+              "AVAILABLE",
+            );
+          }
+        }
+      },
+    );
 
     await t.test(
       "20 simultaneous requests sell the last unit once",

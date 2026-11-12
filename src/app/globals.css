@@ -2078,3 +2078,17 @@ td small {
   .events-select-group { width: 100%; }
   .events-filter-select { flex: 1; }
 }
+
+/* Demo checkout follows the customer pages' dark cards and red actions. */
+.demo-payment { display: grid; gap: 20px; }
+.demo-payment h2 { margin: 0; }
+.demo-payment-badge { padding: 5px 12px; border: 1px solid #d7192055; border-radius: 99px; background: #d719201a; color: #f8a4a8; font-size: 11px; font-weight: 750; letter-spacing: .12em; }
+.demo-payment-body { display: grid; justify-items: center; gap: 10px; padding: 12px 0; text-align: center; }
+.demo-payment-qr { padding: 12px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 6px #ffffff08; max-width: 100%; }
+.demo-payment-qr svg { display: block; max-width: 100%; height: auto; }
+.demo-payment-amount { color: #fff; font-size: clamp(28px, 5vw, 38px); font-variant-numeric: tabular-nums; }
+.demo-payment-ended { display: grid; justify-items: center; gap: 12px; padding: 32px 12px; color: #e5e5e8; }
+.demo-payment .notice { margin: 0; align-items: flex-start; }
+.demo-payment .notice svg { flex-shrink: 0; }
+.demo-payment .mongkol-button { width: 100%; }
+.demo-payment .mongkol-button:disabled { opacity: .55; transform: none; cursor: not-allowed; }

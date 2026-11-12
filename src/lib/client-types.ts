@@ -167,6 +167,7 @@ export interface Booking {
   serverNow: string;
   createdAt?: string;
   snapshot?: {
+    paymentMode?: "DEMO_QR";
     paymentInstructions?: Record<string, unknown>;
     policy?: Record<string, unknown>;
     businessName?: string;
