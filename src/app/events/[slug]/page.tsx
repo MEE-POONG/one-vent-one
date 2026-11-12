@@ -39,8 +39,17 @@ export default async function EventPage({
   }
 
   return (
-    <div className="mongkol-page customer-page">
-      <div className="mongkol-container section">
+    <div className="mongkol-page customer-page event-detail-page">
+      <div className="event-detail-backdrop" aria-hidden="true">
+        <Image
+          src={event.posterUrl || "/concert-hero.png"}
+          alt=""
+          fill
+          sizes="100vw"
+          unoptimized={!!event.posterUrl?.startsWith("https:")}
+        />
+      </div>
+      <div className="mongkol-container section event-detail-content">
         <Link href="/events" className="view-all-button customer-back-link">
           <ArrowLeft size={17} />
           <span>กลับไปตารางอีเวนต์ทั้งหมด</span>
@@ -48,27 +57,12 @@ export default async function EventPage({
 
         <div className="event-detail" style={{ marginTop: 28 }}>
           <div className="stack">
-            <div className="event-cover-frame">
-              <Image
-                className="event-cover"
-                src={event.posterUrl || "/concert-hero.png"}
-                alt={event.title}
-                width={1200}
-                height={600}
-                sizes="(max-width: 800px) 100vw, 65vw"
-                unoptimized={!!event.posterUrl?.startsWith("https:")}
-                priority
-              />
-              <div className="event-cover-badge">
-                <Status value={event.status} />
-              </div>
-            </div>
-
             <div className="customer-card">
               <div className="section-kicker">
                 <span /> EVENT OVERVIEW
               </div>
               <h1 style={{ marginTop: 12 }}>{event.title}</h1>
+              <Status value={event.status} />
 
               <div className="event-facts">
                 <p>

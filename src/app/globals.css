@@ -2030,6 +2030,11 @@ td small {
 .customer-card, .customer-sticky-card, .customer-page .panel { border: 1px solid #27272f; border-radius: 20px; background: #121216; padding: 28px; box-shadow: 0 18px 40px #0006; transition: border-color .25s ease, box-shadow .25s ease; }
 .customer-card:hover { border-color: #383844; }
 .customer-sticky-card { border-top: 2px solid #d71920; }
+.event-detail-page { position: relative; isolation: isolate; }
+.event-detail-backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.event-detail-backdrop img { object-fit: cover; object-position: center top; filter: blur(8px); transform: scale(1.04); opacity: .5; }
+.event-detail-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #07070955 0%, #07070999 45%, #070709 100%); }
+.event-detail-content { position: relative; }
 .event-cover-frame { position: relative; border-radius: 20px; overflow: hidden; border: 1px solid #27272f; background: #121216; box-shadow: 0 22px 48px #0009; }
 .event-cover-frame .event-cover { margin-bottom: 0; height: 380px; border-radius: 0; transition: transform .5s ease; }
 .event-cover-frame:hover .event-cover { transform: scale(1.02); }
