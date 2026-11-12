@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -117,8 +118,17 @@ export function BookingPicker({ slug }: { slug: string }) {
     );
   if (!event) return null;
   return (
-    <div className="mongkol-page customer-page">
-      <div className="mongkol-container section">
+    <div className="mongkol-page customer-page event-detail-page">
+      <div className="event-detail-backdrop" aria-hidden="true">
+        <Image
+          src={event.posterUrl || "/concert-hero.png"}
+          alt=""
+          fill
+          sizes="100vw"
+          unoptimized={!!event.posterUrl?.startsWith("https:")}
+        />
+      </div>
+      <div className="mongkol-container section event-detail-content">
         <Link
           href={`/events/${slug}`}
           className="view-all-button customer-back-link"

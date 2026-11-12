@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -369,9 +370,20 @@ export function TicketVerificationView({ token }: { token: string }) {
     `/api/tickets/verify/${encodeURIComponent(token)}`,
   );
 
+  const posterUrl = resource.data?.event?.posterUrl || "/concert-hero.png";
+
   return (
-    <div className="mongkol-page customer-page">
-      <div className="mongkol-container section">
+    <div className="mongkol-page customer-page event-detail-page">
+      <div className="event-detail-backdrop" aria-hidden="true">
+        <Image
+          src={posterUrl}
+          alt=""
+          fill
+          sizes="100vw"
+          unoptimized={posterUrl.startsWith("https:")}
+        />
+      </div>
+      <div className="mongkol-container section event-detail-content">
         <div className="between" style={{ flexWrap: "wrap", gap: 12 }}>
           <Link href="/events" className="view-all-button customer-back-link">
             <ArrowLeft size={17} />

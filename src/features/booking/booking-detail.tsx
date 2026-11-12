@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -378,8 +379,17 @@ export function BookingDetail({
     booking.status,
   );
   return (
-    <div className="mongkol-page customer-page">
-      <div className="mongkol-container section">
+    <div className="mongkol-page customer-page event-detail-page">
+      <div className="event-detail-backdrop" aria-hidden="true">
+        <Image
+          src={booking.event?.posterUrl || "/concert-hero.png"}
+          alt=""
+          fill
+          sizes="100vw"
+          unoptimized={!!booking.event?.posterUrl?.startsWith("https:")}
+        />
+      </div>
+      <div className="mongkol-container section event-detail-content">
         <Link
           href={
             session?.user

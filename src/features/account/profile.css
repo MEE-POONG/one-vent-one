@@ -9,7 +9,7 @@
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 28px;
-  border-bottom: 1px solid #27272f;
+  border-bottom: 1px solid #ffffff1a;
 }
 .profile-heading h1 {
   font-size: 2rem;
@@ -65,11 +65,11 @@
 .profile-email {
   margin-top: 24px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #27272f;
+  border-bottom: 1px solid #ffffff1a;
 }
 .profile-email span,
 .profile-help {
-  color: #a1a1aa;
+  color: #d4d4d8;
   font-size: 0.875rem;
 }
 .profile-email p {
