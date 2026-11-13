@@ -28,7 +28,7 @@ export default async function RootLayout({
   const logo =
     business?.logo && /^(https:\/\/|\/(?!\/))/.test(business.logo)
       ? business.logo
-      : null;
+      : oneVentOneLogo;
   return (
     <html lang="th" data-scroll-behavior="smooth">
       <body
