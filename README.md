@@ -9,20 +9,22 @@
 ต้องมี Node.js 24 และ npm อินเทอร์เน็ตจำเป็นครั้งแรกสำหรับดาวน์โหลด MongoDB binary และ dependencies
 
 ```powershell
-cd E:\one-vent-one
+cd D:\one-vent-one
 npm ci
 npm run setup:local
-npm run db:dev
+npm run dev
 ```
 
-เปิดอีก terminal โดยคงฐานข้อมูลที่ terminal แรกไว้:
+`npm run dev` สร้าง Prisma client เปิด MongoDB ในเครื่อง รอจนฐานข้อมูลพร้อม แล้วเปิด Next.js ใน terminal เดียว กด Ctrl+C เพื่อปิดเว็บและฐานข้อมูลที่คำสั่งนี้เปิด ข้อมูลเดิมยังอยู่ใน `.local/mongodb` ถ้ามี MongoDB ที่พอร์ต 27018 เปิดอยู่แล้ว ระบบจะตรวจและใช้ตัวเดิมโดยไม่ปิดให้เมื่อหยุดเว็บ หาก `DATABASE_URL` ชี้ Atlas หรือฐานข้อมูลอื่นนอก local replica set ข้างต้น ระบบจะใช้ตามค่านั้นและไม่เปิด MongoDB เพิ่ม สำหรับ Docker ให้เปิด container ก่อนรัน dev เพื่อใช้ฐานข้อมูลใน container
+
+ครั้งต่อไปใช้ `npm run dev` คำสั่งเดียว หากต้องการแยกเปิดเอง ยังใช้ `npm run db:dev` สำหรับฐานข้อมูล และ `npm run dev:web` สำหรับเว็บได้ ส่งตัวเลือก Next.js ต่อท้ายได้ตามเดิม เช่น `npm run dev -- --port 3001`
+
+ครั้งแรกเท่านั้น เปิดอีก terminal โดยคง `npm run dev` ไว้ เพื่อเตรียม schema และข้อมูลเริ่มต้น:
 
 ```powershell
 npm run db:validate
-npm run db:generate
 npm run db:push
 npm run db:seed
-npm run dev
 ```
 
 เปิด [OneVentOne ในเครื่อง](http://127.0.0.1:3000) ระหว่างพัฒนาเปิดด้วย `localhost:3000` ได้เช่นกัน ที่อยู่อื่น (เช่น IP ในวง LAN) ต้องเพิ่มใน `TRUSTED_ORIGINS` มิฉะนั้นเข้าสู่ระบบจะขึ้น Invalid origin ข้อมูล MongoDB เก็บถาวรใน `.local/mongodb` (แยกกันในแต่ละเครื่อง บัญชีที่สร้างในเครื่องหนึ่งจะไม่มีในอีกเครื่อง) และหลักฐานใน `.local/uploads` คำสั่ง seed รันซ้ำโดยไม่รีเซ็ตราคา ผัง หรือการจองเดิม
@@ -35,7 +37,7 @@ npm run dev
 
 ## สร้างผู้ดูแลครั้งแรก
 
-เปิดฐานข้อมูลไว้ (`npm run db:dev`) แล้วรันคำสั่งใน terminal ระบบจะถามอีเมล ชื่อ และรหัสผ่าน (อย่างน้อย 8 ตัวอักษร ไม่แสดงบนจอ) ไม่ใช้บัญชีหรือรหัสผ่าน production
+เปิดระบบไว้ (`npm run dev` หรือเปิดเฉพาะฐานข้อมูลด้วย `npm run db:dev`) แล้วรันคำสั่งในอีก terminal ระบบจะถามอีเมล ชื่อ และรหัสผ่าน (อย่างน้อย 8 ตัวอักษร ไม่แสดงบนจอ) ไม่ใช้บัญชีหรือรหัสผ่าน production
 
 ```powershell
 npm run admin:create
