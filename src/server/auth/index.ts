@@ -8,6 +8,7 @@ import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { trustedOrigins } from "@/server/origins";
+import { hasRole } from "@/server/permissions";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000";
 const createAdapter = prismaAdapter(prisma, { provider: "mongodb" });
@@ -91,35 +92,58 @@ export type Actor = {
 };
 
 const GUEST_COOKIE_NAME = "ovo_guest_actor";
+const GUEST_EMAIL_DOMAIN = "@guest.oneventone.local";
 
+// Guest cookies are signed with the auth secret only. There is deliberately no
+// fallback key: a key written in the source would let anyone forge a cookie
+// for any account id.
 function guestSigningSecret() {
-  return (
-    process.env.BETTER_AUTH_SECRET ||
-    process.env.TICKET_ENCRYPTION_KEY ||
-    "oneventone-guest-signing-secret"
-  );
+  return process.env.BETTER_AUTH_SECRET || null;
+}
+
+function requireGuestSigningSecret() {
+  const secret = guestSigningSecret();
+  if (!secret)
+    throw new DomainError(
+      "SERVICE_UNAVAILABLE",
+      "ระบบยังไม่ได้ตั้งค่ากุญแจรักษาความปลอดภัย",
+      503,
+    );
+  return secret;
 }
 
 function signGuestUserId(userId: string) {
-  const mac = createHmac("sha256", guestSigningSecret())
+  const mac = createHmac("sha256", requireGuestSigningSecret())
     .update(`guest:${userId}`)
     .digest("base64url");
   return `${userId}.${mac}`;
 }
 
 function verifyGuestCookie(raw?: string | null): string | null {
-  if (!raw) return null;
+  const secret = guestSigningSecret();
+  if (!raw || !secret) return null;
   const parts = raw.split(".");
   if (parts.length !== 2) return null;
   const [userId, mac] = parts;
   if (!/^[a-f\d]{24}$/i.test(userId) || !mac) return null;
-  const expected = createHmac("sha256", guestSigningSecret())
+  const expected = createHmac("sha256", secret)
     .update(`guest:${userId}`)
     .digest("base64url");
   const a = Buffer.from(mac);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   return userId;
+}
+
+// A guest cookie may only ever stand for a guest account. Even a correctly
+// signed cookie naming a registered user (staff included) is ignored.
+async function guestAccountId(userId: string | null) {
+  if (!userId) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  return user?.email.endsWith(GUEST_EMAIL_DOMAIN) ? userId : null;
 }
 
 export async function requireActor(request?: Request): Promise<Actor> {
@@ -141,6 +165,23 @@ export async function requireActor(request?: Request): Promise<Actor> {
   return { id: user.id, roles: user.roles };
 }
 
+/**
+ * The signed-in staff member (ADMIN or SUPER_ADMIN), or null for anyone else,
+ * signed out included. For deciding whether to render back-office pages; the
+ * API still checks permissions on every request.
+ */
+export async function currentStaff(
+  request?: Request,
+): Promise<Actor | null> {
+  try {
+    const actor = await requireActor(request);
+    return hasRole(actor, "ADMIN") ? actor : null;
+  } catch (error) {
+    if (error instanceof DomainError && error.status === 401) return null;
+    throw error;
+  }
+}
+
 export async function requireCustomerOrGuestActor(
   request?: Request,
   options: { createIfMissing?: boolean } = {},
@@ -148,7 +189,9 @@ export async function requireCustomerOrGuestActor(
   const reqHeaders = request?.headers ?? (await headers());
   const cookieStore = await cookies();
   const rawGuestCookie = cookieStore.get(GUEST_COOKIE_NAME)?.value;
-  const verifiedGuestId = verifyGuestCookie(rawGuestCookie);
+  const verifiedGuestId = await guestAccountId(
+    verifyGuestCookie(rawGuestCookie),
+  );
 
   const session = await auth.api.getSession({ headers: reqHeaders });
   if (session) {
@@ -166,15 +209,9 @@ export async function requireCustomerOrGuestActor(
     }
   }
 
-  if (verifiedGuestId) {
-    const guestUser = await prisma.user.findUnique({
-      where: { id: verifiedGuestId },
-      select: { id: true, roles: true },
-    });
-    if (guestUser) {
-      return { id: guestUser.id, roles: guestUser.roles, isGuest: true };
-    }
-  }
+  // A guest never carries more than customer rights, whatever the stored row says.
+  if (verifiedGuestId)
+    return { id: verifiedGuestId, roles: ["CUSTOMER"], isGuest: true };
 
   if (!options.createIfMissing) {
     throw new DomainError(
@@ -184,10 +221,12 @@ export async function requireCustomerOrGuestActor(
     );
   }
 
+  // Fail before writing, so a missing key never leaves an orphan guest row.
+  requireGuestSigningSecret();
   const createdGuest = await prisma.user.create({
     data: {
       name: "ลูกค้าทั่วไป (Guest)",
-      email: `guest-${randomUUID()}@guest.oneventone.local`,
+      email: `guest-${randomUUID()}${GUEST_EMAIL_DOMAIN}`,
       roles: ["CUSTOMER"],
     },
     select: { id: true, roles: true },

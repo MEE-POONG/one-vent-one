@@ -120,7 +120,6 @@ export function SiteHeader({
         <Link href="/" onClick={(e) => navigateToSection(e, "home")}>หน้าแรก</Link>
         <Link href="/#events" onClick={(e) => navigateToSection(e, "events")}>อีเวนต์</Link>
         <Link href="/#contact" onClick={(e) => navigateToSection(e, "contact")}>ติดต่อเรา</Link>
-        {isStaff(roles) ? <Link href="/admin">จัดการระบบ</Link> : null}
       </nav>
       <div className="header-actions">
         <button
@@ -196,7 +195,53 @@ export function SiteHeader({
         <button className="search-backdrop" onClick={() => setSearchOpen(false)} aria-label="ปิดหน้าต่างค้นหา" />
       </>
     ) : null}
-    <aside id="site-menu" className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-label="เมนูหลัก" aria-hidden={!menuOpen} inert={!menuOpen}><button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={22} /></button><Link className="menu-logo" href="/" onClick={(e) => navigateToSection(e, "home")}>OneVent<span>One</span></Link>{menuItems.map(([name, href, sectionId], index) => <Link key={name} href={href} onClick={(e) => sectionId ? navigateToSection(e, sectionId) : setMenuOpen(false)}><span>{name}</span><small>{String(index + 1).padStart(2, "0")}</small></Link>)}<Link className="menu-login" href={session ? "/account" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "โปรไฟล์ของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link></aside>
+    <aside id="site-menu" className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-label="เมนูหลัก" aria-hidden={!menuOpen} inert={!menuOpen}>
+      <div className="menu-top">
+        <Link
+          className="menu-logo"
+          href="/"
+          aria-label={`${businessName} หน้าแรก`}
+          onClick={(e) => navigateToSection(e, "home")}
+        >
+          {logo ? (
+            <Image
+              src={logo}
+              alt={`โลโก้ ${businessName}`}
+              width={180}
+              height={60}
+              unoptimized
+              style={{ objectFit: logo === oneVentOneLogo ? "cover" : "contain" }}
+            />
+          ) : businessName}
+        </Link>
+        <button className="menu-close" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู"><X size={20} /></button>
+      </div>
+      <div className="menu-links">
+        {menuItems.map(([name, href, sectionId]) => (
+          <Link
+            key={name}
+            href={href}
+            aria-current={(href === "/" ? pathname === "/" : !sectionId && pathname.startsWith(href)) ? "page" : undefined}
+            onClick={(e) => sectionId ? navigateToSection(e, sectionId) : setMenuOpen(false)}
+          >
+            <span>{name}</span><ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        ))}
+        {/* Back office: owner (SUPER_ADMIN) and staff (ADMIN) only. The server hides /admin from everyone else regardless. */}
+        {isStaff(roles) ? (
+          <div className="menu-staff">
+            <Link
+              href="/admin"
+              aria-current={pathname.startsWith("/admin") ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
+            >
+              <span>จัดการระบบ</span><ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        ) : null}
+      </div>
+      <Link className="menu-login" href={session ? "/account" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "โปรไฟล์ของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link>
+    </aside>
     {menuOpen ? <button className="menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" /> : null}
   </header>;
 }
