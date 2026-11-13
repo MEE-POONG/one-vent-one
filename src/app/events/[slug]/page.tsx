@@ -104,9 +104,8 @@ export default async function EventPage({
               <div className="notice" style={{ marginTop: 16 }}>
                 <ShieldCheck size={19} style={{ color: "#d71920" }} />
                 <p>
-                  เมื่อสร้างการจอง คุณมีเวลา {business?.holdMinutes || 15}{" "}
-                  นาทีเพื่อโอนเงินและส่งหลักฐาน
-                  การส่งสลิปยังไม่ใช่การยืนยันจนกว่าผู้ดูแลจะตรวจสอบเรียบร้อย
+                  เมื่อสร้างการจอง คุณมีเวลา {business?.holdMinutes || 5}{" "}
+                  นาทีเพื่อชำระเงินผ่าน QR Code ให้เสร็จสิ้นภายในเวลาที่กำหนด
                 </p>
               </div>
             </section>

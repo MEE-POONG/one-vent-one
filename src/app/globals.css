@@ -2238,3 +2238,414 @@ td small {
   .vticket-front-footer, .vticket-back-footer { flex-direction: column; align-items: stretch; }
   .vticket-flip-btn { width: 100%; }
 }
+
+/* Site Footer — Multi-Column Layout & Cutout Brand Logo */
+.site-footer {
+  border-top: 1px solid #ffffff1a;
+  background: radial-gradient(ellipse at 18% 0%, #d719201a, transparent 48%), #050507;
+  padding: 58px 0 32px;
+  color: #a1a1aa;
+  font-size: 13.5px;
+  display: block;
+}
+.site-footer-inner {
+  width: min(1240px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.site-footer-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr 1fr 1fr;
+  gap: 38px;
+  align-items: start;
+}
+.site-footer-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.footer-logo-link {
+  display: inline-flex;
+  align-items: center;
+  transition: transform .22s ease, opacity .22s ease;
+}
+.footer-logo-link:hover {
+  transform: scale(1.03);
+}
+.site-footer .footer-tagline {
+  margin-top: 2px;
+  color: #d4d4d8;
+  font-size: 13.5px;
+  max-width: 34ch;
+}
+.footer-venue-info {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #a1a1aa;
+  font-size: 12.5px;
+}
+.footer-venue-info strong {
+  color: #ffffff;
+  font-size: 13.5px;
+}
+.site-footer .footer-venue-info p {
+  margin-top: 0;
+}
+.site-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.footer-title {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.footer-links a {
+  color: #a1a1aa;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: color .2s ease, transform .2s ease;
+}
+.footer-links a:hover {
+  color: #d71920;
+  transform: translateX(3px);
+}
+.site-footer-bottom {
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid #ffffff14;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #71717a;
+  font-size: 12.5px;
+}
+.site-footer-bottom p {
+  margin-top: 0;
+}
+@media (max-width: 920px) {
+  .site-footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+  }
+}
+@media (max-width: 560px) {
+  .site-footer-inner {
+    width: calc(100% - 32px);
+  }
+  .site-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+  .site-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* How to Book & FAQ Pages (Fluent / Mica / Acrylic Customer Theme) */
+.guide-accent {
+  color: #d71920;
+}
+.guide-content-section {
+  padding: 46px 0 88px;
+}
+.guide-container {
+  max-width: 920px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.guide-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.guide-step-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: start;
+  transition: transform .22s ease, border-color .25s ease, box-shadow .25s ease;
+}
+.guide-step-card:hover {
+  transform: translateY(-3px);
+  border-color: #d71920;
+  box-shadow: 0 22px 46px #d7192026, inset 0 1px 0 #ffffff29;
+}
+.guide-step-badge-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.guide-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #d71920;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  box-shadow: 0 8px 20px #d719204d;
+}
+.guide-step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: 1px solid #ffffff21;
+  background: #ffffff0f;
+  color: #ffffff;
+  backdrop-filter: blur(14px);
+  transition: background .22s ease, border-color .22s ease, color .22s ease;
+}
+.guide-step-card:hover .guide-step-icon {
+  border-color: #d71920;
+  background: #d7192024;
+  color: #ff4d55;
+}
+.guide-step-body h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.guide-step-desc {
+  color: #e4e4e7;
+  line-height: 1.65;
+  margin-bottom: 14px;
+}
+.guide-step-desc a {
+  color: #ff4d55;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.guide-step-points {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #d4d4d8;
+  font-size: 13.5px;
+}
+.guide-step-points li::marker {
+  color: #d71920;
+}
+.guide-tips-card {
+  border-top: 2px solid #d71920;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.guide-tips-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.guide-tips-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #d7192026;
+  border: 1px solid #d7192066;
+  color: #ff4d55;
+  flex-shrink: 0;
+}
+.guide-tips-head h2 {
+  font-size: 21px;
+  margin-top: 4px;
+}
+.guide-hold-highlight {
+  border-color: #d7192066;
+  background: linear-gradient(135deg, #240c10ad 0%, #141218c4 100%);
+}
+.guide-hold-highlight svg {
+  color: #ff4d55;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.guide-hold-highlight strong {
+  color: #ffffff;
+}
+.guide-tips-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+.guide-tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #ffffff17;
+  background: #ffffff0a;
+  color: #e4e4e7;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.guide-tips-list li svg {
+  color: #d71920;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.guide-tips-list li strong {
+  color: #ffffff;
+}
+.guide-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.faq-category-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.faq-category-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.faq-category-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.faq-category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #d7192026;
+  border: 1px solid #d7192066;
+  color: #ff4d55;
+  flex-shrink: 0;
+}
+.faq-category-head small {
+  display: block;
+  color: #d71920;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+.faq-category-head h2 {
+  color: #ffffff;
+  font-size: 22px;
+  margin-top: 2px;
+}
+.faq-accordion-card {
+  padding: 8px 24px;
+}
+.faq-accordion-item {
+  border-bottom: 1px solid #ffffff14;
+}
+.faq-accordion-item:last-child {
+  border-bottom: 0;
+}
+.faq-accordion-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color .2s ease;
+}
+.faq-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+.faq-accordion-summary:hover {
+  color: #ff4d55;
+}
+.faq-accordion-chevron {
+  color: #a1a1aa;
+  flex-shrink: 0;
+  transition: transform .24s ease, color .2s ease;
+}
+.faq-accordion-item[open] .faq-accordion-chevron {
+  transform: rotate(180deg);
+  color: #d71920;
+}
+.faq-accordion-body {
+  padding: 0 0 18px;
+  color: #d4d4d8;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.faq-accordion-body strong {
+  color: #ffffff;
+}
+.faq-help-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  border-top: 2px solid #d71920;
+}
+.faq-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #d7192026;
+  border: 1px solid #d7192066;
+  color: #ff4d55;
+}
+.faq-help-card p {
+  max-width: 54ch;
+}
+@media (max-width: 640px) {
+  .guide-step-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .guide-step-badge-col {
+    flex-direction: row;
+  }
+  .guide-cta-row {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .guide-cta-row > a {
+    width: 100%;
+    justify-content: center;
+  }
+}
