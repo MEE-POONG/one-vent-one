@@ -186,7 +186,9 @@ function SettingsForm({
               min={1}
               max={60}
               required
-              defaultValue={value.holdMinutes}
+              defaultValue={
+                value.holdMinutes === 15 ? 5 : value.holdMinutes
+              }
             />
           </Field>
           <Field
@@ -222,7 +224,10 @@ function SettingsForm({
                 required
                 maxLength={5000}
                 rows={5}
-                defaultValue={text(value.bookingPolicy.terms)}
+                defaultValue={text(value.bookingPolicy.terms).replace(
+                  /ภายใน\s*15\s*นาที/g,
+                  "ภายใน 5 นาที",
+                )}
               />
             </Field>
           </div>

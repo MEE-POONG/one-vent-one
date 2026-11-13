@@ -73,7 +73,7 @@ model BusinessProfile {
   contact             Json
   paymentInstructions Json
   bookingPolicy       Json
-  holdMinutes         Int      @default(15)
+  holdMinutes         Int      @default(5)
   reviewHours         Int      @default(24)
   correctionHours     Int      @default(24)
   version             Int      @default(0)

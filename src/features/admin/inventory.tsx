@@ -73,17 +73,30 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
   }
   function editPrice(
     kind: "units" | "ticket-types",
-    item: { id: string; name: string; priceSatang: number },
+    item: {
+      id: string;
+      name: string;
+      priceSatang: number;
+      admissionCount?: number;
+    },
   ) {
     if (!event) return;
     const name = window.prompt("ชื่อที่แสดง", item.name);
     if (name === null) return;
+    const seats =
+      kind === "units"
+        ? window.prompt(
+            "จำนวนที่นั่งในโต๊ะ (คน)",
+            String(item.admissionCount ?? 4),
+          )
+        : "1";
+    if (seats === null) return;
     const price = window.prompt(
       "ราคาใหม่ (บาท) ใช้กับรายการจองใหม่",
       String(item.priceSatang / 100),
     );
     if (price === null) return;
-    const reason = window.prompt("เหตุผลการแก้ไขราคา / ชื่อ");
+    const reason = window.prompt("เหตุผลการแก้ไขราคา / ที่นั่ง");
     if (reason)
       void submit(
         `${kind}/${item.id}/price`,
@@ -91,6 +104,9 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
           eventVersion: event.version,
           name,
           priceSatang: Math.round(Number(price) * 100),
+          ...(kind === "units"
+            ? { admissionCount: Math.max(1, Math.min(20, Number(seats) || 4)) }
+            : {}),
           reason,
         },
         "PATCH",

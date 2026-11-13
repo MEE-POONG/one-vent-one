@@ -35,6 +35,7 @@ export function LayoutEditor({ eventId }: { eventId: string }) {
           eventId={eventId}
           initial={resource.data}
           event={event.data}
+          onEventReload={event.reload}
         />
       ) : null}
     </>

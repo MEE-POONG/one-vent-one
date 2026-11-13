@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { api, ApiError, useResource } from "@/lib/client-api";
@@ -13,7 +13,6 @@ import {
   Loading,
   money,
   PageHeading,
-  Status,
   modeText,
 } from "@/components/ui";
 import { VenueView } from "@/components/venue-view";
@@ -32,26 +31,32 @@ export function BookingPicker({ slug }: { slug: string }) {
   );
   const [zoneId, setZoneId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [accepted, setAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const intent = useRef<{ payload: string; key: string } | null>(null);
   const data = availability.data;
-  const activeZone = zoneId || event?.zones?.[0]?.id;
-  const units = data?.units.filter((u) => u.zoneId === activeZone) || [];
-  const ticketTypes =
-    data?.ticketTypes.filter((t) => t.zoneId === activeZone) || [];
+  const tableZones = useMemo(() => {
+    const filtered = (event?.zones || []).filter(
+      (z) => z.sellingMode === "TABLE",
+    );
+    return filtered.length ? filtered : event?.zones || [];
+  }, [event?.zones]);
+  const activeZone = zoneId || tableZones[0]?.id;
+  const units =
+    data?.units.filter(
+      (u) => u.zoneId === activeZone && u.sellingMode === "TABLE",
+    ) || [];
   const selectedUnits =
     data?.units.filter((u) => selected.includes(u.id)) || [];
-  const selectedTypes =
-    data?.ticketTypes.filter((t) => (quantities[t.id] || 0) > 0) || [];
-  const estimatedTotal =
-    selectedUnits.reduce((s, u) => s + u.priceSatang, 0) +
-    selectedTypes.reduce((s, t) => s + t.priceSatang * quantities[t.id], 0);
-  const admissions =
-    selectedUnits.reduce((s, u) => s + u.admissionCount, 0) +
-    selectedTypes.reduce((s, t) => s + quantities[t.id], 0);
+  const estimatedTotal = selectedUnits.reduce(
+    (s, u) => s + u.priceSatang,
+    0,
+  );
+  const admissions = selectedUnits.reduce(
+    (s, u) => s + u.admissionCount,
+    0,
+  );
   function toggle(id: string) {
     setSelected((values) =>
       values.includes(id) ? values.filter((v) => v !== id) : [...values, id],
@@ -65,13 +70,7 @@ export function BookingPicker({ slug }: { slug: string }) {
     if (!event) return;
     const payload = {
       eventId: event.id,
-      items: [
-        ...selected.map((unitId) => ({ unitId, quantity: 1 })),
-        ...selectedTypes.map((t) => ({
-          ticketTypeId: t.id,
-          quantity: quantities[t.id],
-        })),
-      ],
+      items: selected.map((unitId) => ({ unitId, quantity: 1 })),
     };
     const canonical = JSON.stringify(payload);
     if (intent.current?.payload !== canonical)
@@ -97,7 +96,6 @@ export function BookingPicker({ slug }: { slug: string }) {
       if (e instanceof ApiError && e.code === "INVENTORY_UNAVAILABLE") {
         await availability.reload();
         setSelected([]);
-        setQuantities({});
         intent.current = null;
       }
     } finally {
@@ -152,113 +150,81 @@ export function BookingPicker({ slug }: { slug: string }) {
               ที่นั่งจะถูกกันไว้เมื่อสร้างการจองสำเร็จเท่านั้น
             </div>
             <div className="customer-card">
-              <div className="tabs" role="tablist" aria-label="โซน">
-                {event.zones?.map((zone) => (
-                  <button
-                    key={zone.id}
-                    role="tab"
-                    aria-selected={activeZone === zone.id}
-                    onClick={() => setZoneId(zone.id)}
+              <div className="between floorplan-card-head">
+                <div>
+                  <h3 className="floorplan-section-title">เลือกโต๊ะของคุณ</h3>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
+                    คลิกเลือกโต๊ะว่างสีเขียวจากผังด้านล่าง
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="floorplan-refresh-pill"
+                  onClick={availability.reload}
+                >
+                  <RefreshCw size={14} />
+                  <span>อัปเดตผัง</span>
+                </button>
+              </div>
+              <div className="floorplan-legend" aria-label="สัญลักษณ์สถานะการจองโต๊ะ">
+                <span className="floorplan-legend-item">
+                  <i className="floorplan-swatch is-available" aria-hidden="true" />
+                  <span>ว่าง</span>
+                </span>
+                <span className="floorplan-legend-item">
+                  <i className="floorplan-swatch is-sold" aria-hidden="true" />
+                  <span>จองแล้ว</span>
+                </span>
+                <span className="floorplan-legend-item">
+                  <i className="floorplan-swatch is-selected" aria-hidden="true" />
+                  <span>เลือกแล้ว</span>
+                </span>
+                {units.length > 0 ? (
+                  <span
+                    className="muted"
+                    style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 600 }}
                   >
-                    {zone.name} · {modeText(zone.sellingMode)}
-                  </button>
-                ))}
+                    โต๊ะว่าง{" "}
+                    {
+                      units.filter(
+                        (u) =>
+                          (u.status || u.inventory?.status) === "AVAILABLE",
+                      ).length
+                    }{" "}
+                    / {units.length} โต๊ะ
+                  </span>
+                ) : null}
               </div>
-              {data?.layout ? (
-                <VenueView
-                  layout={data.layout}
-                  units={data.units}
-                  selected={selected}
-                  onSelect={toggle}
-                />
+              {tableZones.length > 1 ? (
+                <div className="tabs" role="tablist" aria-label="โซนโต๊ะ">
+                  {tableZones.map((zone) => (
+                    <button
+                      key={zone.id}
+                      role="tab"
+                      aria-selected={activeZone === zone.id}
+                      onClick={() => setZoneId(zone.id)}
+                    >
+                      {zone.name} · {modeText(zone.sellingMode)}
+                    </button>
+                  ))}
+                </div>
               ) : null}
-              <div className="legend">
-                {[
-                  "AVAILABLE",
-                  "HELD",
-                  "REVIEW_RESERVED",
-                  "SOLD",
-                  "BLOCKED",
-                ].map((status) => (
-                  <Status key={status} value={status} />
-                ))}
-              </div>
               <ErrorNotice
                 error={availability.error}
                 retry={availability.reload}
               />
-              {availability.loading ? (
+              {availability.loading && !data?.layout ? (
                 <Loading />
+              ) : data?.layout ? (
+                <VenueView
+                  layout={data.layout}
+                  units={data.units.filter((u) => u.sellingMode === "TABLE")}
+                  selected={selected}
+                  onSelect={toggle}
+                  tablesOnly
+                />
               ) : (
-                <>
-                  <div className="between" style={{ margin: "24px 0 17px" }}>
-                    <h3>เลือกจากรายการ</h3>
-                    <button className="text-link" onClick={availability.reload}>
-                      <RefreshCw size={13} />
-                      อัปเดตที่ว่าง
-                    </button>
-                  </div>
-                  <div className="unit-grid">
-                    {units.map((unit) => {
-                      const status =
-                        unit.status || unit.inventory?.status || "BLOCKED";
-                      return (
-                        <button
-                          key={unit.id}
-                          className={`unit-choice ${selected.includes(unit.id) ? "selected" : ""}`}
-                          aria-pressed={selected.includes(unit.id)}
-                          disabled={status !== "AVAILABLE"}
-                          onClick={() => toggle(unit.id)}
-                        >
-                          <strong>{unit.code}</strong>
-                          <span>{money(unit.priceSatang)}</span>
-                          <small>{unit.admissionCount} สิทธิ์เข้า</small>
-                          <Status value={status} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {ticketTypes.map((type) => {
-                    const pool = data?.pools.find((p) => p.id === type.poolId);
-                    return (
-                      <div className="ga-choice" key={type.id}>
-                        <div>
-                          <h3>{type.name}</h3>
-                          <p>
-                            {money(type.priceSatang)} / คน · คงเหลือร่วม{" "}
-                            {pool?.available ?? 0} สิทธิ์
-                          </p>
-                        </div>
-                        <label className="field">
-                          <span className="sr-only">จำนวน {type.name}</span>
-                          <select
-                            value={quantities[type.id] || 0}
-                            onChange={(e) =>
-                              setQuantities((q) => ({
-                                ...q,
-                                [type.id]: Number(e.target.value),
-                              }))
-                            }
-                          >
-                            {Array.from(
-                              {
-                                length: Math.min(20, pool?.available || 0) + 1,
-                              },
-                              (_, i) => (
-                                <option key={i} value={i}>
-                                  {i}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        </label>
-                      </div>
-                    );
-                  })}
-                  {units.length === 0 && ticketTypes.length === 0 ? (
-                    <Empty title="โซนนี้ยังไม่มีหน่วยเปิดขาย" />
-                  ) : null}
-                </>
+                <Empty title="โซนนี้ยังไม่มีผังโต๊ะเปิดขาย" />
               )}
             </div>
           </div>
@@ -281,32 +247,23 @@ export function BookingPicker({ slug }: { slug: string }) {
                 </small>
               </div>
             </div>
-            {selectedUnits.length || selectedTypes.length ? (
+            {selectedUnits.length ? (
               <ul className="summary-list">
                 {selectedUnits.map((u) => (
                   <li key={u.id}>
                     <span>
                       {u.name || u.code}
                       <small>
-                        1 {modeText(u.sellingMode)} · {u.admissionCount} คน
+                        1 โต๊ะ · {u.admissionCount} ที่นั่ง
                       </small>
                     </span>
                     <strong>{money(u.priceSatang)}</strong>
                   </li>
                 ))}
-                {selectedTypes.map((t) => (
-                  <li key={t.id}>
-                    <span>
-                      {t.name}
-                      <small>{quantities[t.id]} ใบ</small>
-                    </span>
-                    <strong>{money(t.priceSatang * quantities[t.id])}</strong>
-                  </li>
-                ))}
               </ul>
             ) : (
               <p className="muted" style={{ fontSize: 13 }}>
-                เลือกโต๊ะ ที่นั่ง หรือบัตรจากรายการ
+                คลิกเลือกโต๊ะว่างจากผังด้านซ้าย
               </p>
             )}
             <div className="summary-row">

@@ -31,14 +31,25 @@ const typeLabels: Record<LayoutObject["type"], string> = {
   table: "โต๊ะ",
   seat: "ที่นั่ง",
 };
+const toolbarTypes: LayoutObject["type"][] = [
+  "zone",
+  "stage",
+  "entrance",
+  "aisle",
+  "service",
+  "label",
+  "table",
+];
 const snap = (value: number) => Math.round(value / 10) * 10;
 function Shape({
   object,
+  unit,
   selected,
   onSelect,
   onChange,
 }: {
   object: LayoutObject;
+  unit?: Unit;
   selected: boolean;
   onSelect: () => void;
   onChange: (v: Partial<LayoutObject>) => void;
@@ -122,15 +133,20 @@ function Shape({
           />
         )}
         <Text
-          text={object.name || object.code}
+          text={
+            unit
+              ? `${unit.code}\n${unit.admissionCount} ที่ · ฿${Math.round(unit.priceSatang / 100).toLocaleString("th-TH")}`
+              : object.name || object.code
+          }
           width={object.width}
           height={object.type === "zone" ? 28 : object.height}
           align="center"
           verticalAlign="middle"
           fontFamily="Noto Sans Thai Variable"
-          fontSize={object.type === "stage" ? 20 : 13}
+          fontSize={object.type === "stage" ? 20 : unit ? 10 : 13}
+          lineHeight={1.2}
           fill="#f4f4f5"
-          padding={4}
+          padding={3}
           listening={false}
         />
       </Group>
@@ -156,10 +172,12 @@ export default function LayoutCanvas({
   eventId,
   initial,
   event,
+  onEventReload,
 }: {
   eventId: string;
   initial: VenueLayout;
   event: EventData;
+  onEventReload?: () => Promise<void>;
 }) {
   const [layout, setLayout] = useState(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
@@ -169,13 +187,27 @@ export default function LayoutCanvas({
   const [pan, setPan] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [eventVersion, setEventVersion] = useState(event.version);
+  const [units, setUnits] = useState<Unit[]>(
+    () =>
+      (event.units ||
+        event.zones?.flatMap((z) => z.units || []) ||
+        []) as Unit[],
+  );
+  const [unitDraftSeats, setUnitDraftSeats] = useState<Record<string, string>>(
+    {},
+  );
+  const [unitDraftPrice, setUnitDraftPrice] = useState<Record<string, string>>(
+    {},
+  );
+  const [newTableSeats, setNewTableSeats] = useState("4");
+  const [newTablePrice, setNewTablePrice] = useState("2400");
   const mutation = useMutation();
+  const unitMutation = useMutation();
   const selected = layout.geometry.objects.find((o) => o.id === selectedId);
   const dirty = JSON.stringify(layout) !== saved;
-  const units = (event.units ||
-    event.zones?.flatMap((z) => z.units || []) ||
-    []) as Unit[];
   const zones = event.zones || [];
+
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -237,7 +269,7 @@ export default function LayoutCanvas({
       code,
       name: typeLabels[type],
       type,
-      shape: type === "table" ? "circle" : "rect",
+      shape: "rect",
       x: 80,
       y: 80,
       ...size,
@@ -374,18 +406,18 @@ export default function LayoutCanvas({
         </div>
       ) : null}
       {preview ? (
-        <VenueView layout={layout} />
+        <VenueView layout={layout} units={units} />
       ) : (
         <>
           <div className="editor-toolbar">
-            {Object.entries(typeLabels).map(([type, label]) => (
+            {toolbarTypes.map((type) => (
               <button
                 key={type}
                 className="button button-subtle button-small"
-                onClick={() => add(type as LayoutObject["type"])}
+                onClick={() => add(type)}
               >
                 <Plus size={13} />
-                {label}
+                {typeLabels[type]}
               </button>
             ))}
           </div>
@@ -494,6 +526,11 @@ export default function LayoutCanvas({
                       <Shape
                         key={object.id}
                         object={object}
+                        unit={
+                          object.unitId
+                            ? units.find((u) => u.id === object.unitId)
+                            : undefined
+                        }
                         selected={selectedId === object.id}
                         onSelect={() => setSelectedId(object.id)}
                         onChange={(value) => changeObject(object.id, value)}
@@ -553,40 +590,256 @@ export default function LayoutCanvas({
                       </Field>
                     </div>
                     {["table", "seat"].includes(selected.type) ? (
-                      <div className="full">
-                        <Field label="หน่วยขายที่ผูก">
-                          <select
-                            value={selected.unitId || ""}
-                            onChange={(e) => {
-                              const unit = units.find(
-                                (u) => u.id === e.target.value,
-                              );
-                              changeObject(selected.id, {
-                                unitId: e.target.value || undefined,
-                                ...(unit
-                                  ? {
-                                      zoneId: unit.zoneId,
-                                      name: unit.name,
-                                      code: unit.code,
-                                    }
-                                  : {}),
-                              });
-                            }}
-                          >
-                            <option value="">เลือกหน่วยขาย</option>
-                            {units
-                              .filter(
-                                (u) =>
-                                  u.sellingMode.toLowerCase() === selected.type,
-                              )
-                              .map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.code} · {u.name}
-                                </option>
-                              ))}
-                          </select>
-                        </Field>
-                      </div>
+                      <>
+                        <div className="full">
+                          <Field label="โต๊ะ / หน่วยขายที่ผูก">
+                            <select
+                              value={selected.unitId || ""}
+                              onChange={(e) => {
+                                const unit = units.find(
+                                  (u) => u.id === e.target.value,
+                                );
+                                changeObject(selected.id, {
+                                  unitId: e.target.value || undefined,
+                                  ...(unit
+                                    ? {
+                                        zoneId: unit.zoneId,
+                                        name: unit.name,
+                                        code: unit.code,
+                                      }
+                                    : {}),
+                                });
+                              }}
+                            >
+                              <option value="">เลือกโต๊ะ / หน่วยขาย</option>
+                              {units
+                                .filter(
+                                  (u) =>
+                                    u.sellingMode.toLowerCase() ===
+                                    selected.type,
+                                )
+                                .map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.code} · {u.name} ({u.admissionCount} ที่ ·{" "}
+                                    ฿
+                                    {Math.round(
+                                      u.priceSatang / 100,
+                                    ).toLocaleString("th-TH")}
+                                    )
+                                  </option>
+                                ))}
+                            </select>
+                          </Field>
+                        </div>
+                        {(() => {
+                          const linkedUnit = selected.unitId
+                            ? units.find((u) => u.id === selected.unitId)
+                            : undefined;
+                          if (linkedUnit) {
+                            const currentSeats =
+                              unitDraftSeats[linkedUnit.id] ??
+                              String(linkedUnit.admissionCount);
+                            const currentPrice =
+                              unitDraftPrice[linkedUnit.id] ??
+                              String(linkedUnit.priceSatang / 100);
+                            return (
+                              <div className="full panel stack-sm" style={{ padding: 14 }}>
+                                <strong style={{ fontSize: 13 }}>
+                                  ตั้งค่าที่นั่งและราคา ({linkedUnit.code})
+                                </strong>
+                                <div className="form-grid">
+                                  <Field label="จำนวนที่นั่งในโต๊ะ">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={20}
+                                      value={currentSeats}
+                                      onChange={(e) =>
+                                        setUnitDraftSeats((prev) => ({
+                                          ...prev,
+                                          [linkedUnit.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </Field>
+                                  <Field label="ราคาโต๊ะ (บาท)">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      step="0.01"
+                                      value={currentPrice}
+                                      onChange={(e) =>
+                                        setUnitDraftPrice((prev) => ({
+                                          ...prev,
+                                          [linkedUnit.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </Field>
+                                </div>
+                                <ErrorNotice error={unitMutation.error} />
+                                <button
+                                  type="button"
+                                  className="button button-small"
+                                  disabled={unitMutation.pending}
+                                  onClick={async () => {
+                                    const seatsNum = Math.max(
+                                      1,
+                                      Math.min(20, Number(currentSeats) || 4),
+                                    );
+                                    const priceSatang = Math.max(
+                                      100,
+                                      Math.round(
+                                        (Number(currentPrice) || 0) * 100,
+                                      ),
+                                    );
+                                    try {
+                                      const res = await unitMutation.run<{
+                                        id: string;
+                                        name: string;
+                                        priceSatang: number;
+                                        admissionCount?: number;
+                                        eventVersion: number;
+                                      }>(
+                                        `/api/admin/events/${eventId}/units/${linkedUnit.id}/price`,
+                                        {
+                                          name:
+                                            selected.name || linkedUnit.name,
+                                          priceSatang,
+                                          admissionCount: seatsNum,
+                                          reason:
+                                            "อัปเดตจำนวนที่นั่งและราคาโต๊ะจากหน้าแก้ไขผัง",
+                                          eventVersion,
+                                        },
+                                        "PATCH",
+                                      );
+                                      setEventVersion(res.eventVersion);
+                                      setUnits((prev) =>
+                                        prev.map((u) =>
+                                          u.id === linkedUnit.id
+                                            ? {
+                                                ...u,
+                                                name: res.name,
+                                                priceSatang: res.priceSatang,
+                                                admissionCount:
+                                                  res.admissionCount ??
+                                                  seatsNum,
+                                              }
+                                            : u,
+                                        ),
+                                      );
+                                      setMessage(
+                                        `บันทึกที่นั่ง (${seatsNum} ที่) และราคาของโต๊ะ ${linkedUnit.code} แล้ว`,
+                                      );
+                                      await onEventReload?.();
+                                    } catch {}
+                                  }}
+                                >
+                                  <Save size={14} />
+                                  {unitMutation.pending
+                                    ? "กำลังบันทึก..."
+                                    : "บันทึกที่นั่งและราคาโต๊ะ"}
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (event.status === "DRAFT") {
+                            const tableZones = zones.filter(
+                              (z) => z.sellingMode === "TABLE",
+                            );
+                            const targetZoneId =
+                              selected.zoneId &&
+                              tableZones.some((z) => z.id === selected.zoneId)
+                                ? selected.zoneId
+                                : tableZones[0]?.id;
+                            return (
+                              <div className="full panel stack-sm" style={{ padding: 14 }}>
+                                <strong style={{ fontSize: 13 }}>
+                                  สร้างหน่วยขายโต๊ะใหม่สำหรับวัตถุนี้
+                                </strong>
+                                <div className="form-grid">
+                                  <Field label="จำนวนที่นั่งในโต๊ะ">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={20}
+                                      value={newTableSeats}
+                                      onChange={(e) =>
+                                        setNewTableSeats(e.target.value)
+                                      }
+                                    />
+                                  </Field>
+                                  <Field label="ราคาโต๊ะ (บาท)">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      step="0.01"
+                                      value={newTablePrice}
+                                      onChange={(e) =>
+                                        setNewTablePrice(e.target.value)
+                                      }
+                                    />
+                                  </Field>
+                                </div>
+                                <ErrorNotice error={unitMutation.error} />
+                                <button
+                                  type="button"
+                                  className="button button-small"
+                                  disabled={
+                                    unitMutation.pending || !targetZoneId
+                                  }
+                                  onClick={async () => {
+                                    if (!targetZoneId) return;
+                                    const seatsNum = Math.max(
+                                      1,
+                                      Math.min(20, Number(newTableSeats) || 4),
+                                    );
+                                    const priceSatang = Math.max(
+                                      100,
+                                      Math.round(
+                                        (Number(newTablePrice) || 2400) * 100,
+                                      ),
+                                    );
+                                    try {
+                                      const created =
+                                        await unitMutation.run<Unit>(
+                                          `/api/admin/events/${eventId}/units`,
+                                          {
+                                            zoneId: targetZoneId,
+                                            code: selected.code,
+                                            name:
+                                              selected.name ||
+                                              `โต๊ะ ${selected.code}`,
+                                            sellingMode: "TABLE",
+                                            admissionCount: seatsNum,
+                                            priceSatang,
+                                          },
+                                          "POST",
+                                        );
+                                      setEventVersion((v) => v + 1);
+                                      setUnits((prev) => [...prev, created]);
+                                      changeObject(selected.id, {
+                                        unitId: created.id,
+                                        zoneId: created.zoneId,
+                                        code: created.code,
+                                        name: created.name,
+                                      });
+                                      setMessage(
+                                        `สร้างและผูกโต๊ะ ${created.code} (${seatsNum} ที่) เรียบร้อย`,
+                                      );
+                                      await onEventReload?.();
+                                    } catch {}
+                                  }}
+                                >
+                                  <Plus size={14} />
+                                  สร้างและผูกโต๊ะนี้
+                                </button>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </>
                     ) : null}
                     <Field label="รูปทรง">
                       <select

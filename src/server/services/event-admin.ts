@@ -557,7 +557,13 @@ export async function editPrice(
       kind === "unit"
         ? await tx.bookableUnit.updateMany({
             where: { id, eventId },
-            data: { name: input.name, priceSatang: input.priceSatang },
+            data: {
+              name: input.name,
+              priceSatang: input.priceSatang,
+              ...(input.admissionCount !== undefined
+                ? { admissionCount: input.admissionCount }
+                : {}),
+            },
           })
         : await tx.ticketType.updateMany({
             where: { id, eventId },
@@ -571,12 +577,20 @@ export async function editPrice(
       kind === "unit" ? "BookableUnit" : "TicketType",
       id,
       input.reason,
-      { priceSatang: input.priceSatang },
+      {
+        priceSatang: input.priceSatang,
+        ...(input.admissionCount !== undefined
+          ? { admissionCount: input.admissionCount }
+          : {}),
+      },
     );
     return {
       id,
       name: input.name,
       priceSatang: input.priceSatang,
+      ...(input.admissionCount !== undefined
+        ? { admissionCount: input.admissionCount }
+        : {}),
       eventVersion: input.eventVersion + 1,
     };
   });

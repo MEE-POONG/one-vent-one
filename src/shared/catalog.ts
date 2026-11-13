@@ -104,6 +104,7 @@ export const poolInput = z.object({
 export const priceEditInput = z.object({
   name: z.string().trim().min(1).max(100),
   priceSatang: price,
+  admissionCount: z.number().int().min(1).max(20).optional(),
   reason: z.string().trim().min(3).max(1000),
   eventVersion: z.number().int().min(0),
 });

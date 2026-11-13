@@ -283,30 +283,38 @@ export function JsonFacts({ value }: { value?: Record<string, unknown> }) {
     <dl className="facts">
       {Object.entries(value)
         .filter(([, v]) => typeof v === "string" || typeof v === "number")
-        .map(([k, v]) => (
-          <div key={k}>
-            <dt>
-              {(
-                {
-                  bankName: "ธนาคาร",
-                  accountName: "ชื่อบัญชี",
-                  accountNumber: "เลขบัญชี",
-                  note: "หมายเหตุ",
-                  phone: "โทรศัพท์",
-                  address: "ที่อยู่",
-                  line: "LINE",
-                  email: "อีเมล",
-                  terms: "เงื่อนไข",
-                  holdMinutes: "เวลาชำระ (นาที)",
-                  reviewHours: "ระยะตรวจสอบ (ชั่วโมง)",
-                  correctionHours: "ระยะแก้หลักฐาน (ชั่วโมง)",
-                  maxAdmissions: "สิทธิ์สูงสุดต่อการจอง",
-                } as Record<string, string>
-              )[k] || k}
-            </dt>
-            <dd>{String(v)}</dd>
-          </div>
-        ))}
+        .map(([k, v]) => {
+          const normalized =
+            k === "holdMinutes" && Number(v) === 15
+              ? "5"
+              : k === "terms" && typeof v === "string"
+                ? v.replace(/ภายใน\s*15\s*นาที/g, "ภายใน 5 นาที")
+                : String(v);
+          return (
+            <div key={k}>
+              <dt>
+                {(
+                  {
+                    bankName: "ธนาคาร",
+                    accountName: "ชื่อบัญชี",
+                    accountNumber: "เลขบัญชี",
+                    note: "หมายเหตุ",
+                    phone: "โทรศัพท์",
+                    address: "ที่อยู่",
+                    line: "LINE",
+                    email: "อีเมล",
+                    terms: "เงื่อนไข",
+                    holdMinutes: "เวลาชำระ (นาที)",
+                    reviewHours: "ระยะตรวจสอบ (ชั่วโมง)",
+                    correctionHours: "ระยะแก้หลักฐาน (ชั่วโมง)",
+                    maxAdmissions: "สิทธิ์สูงสุดต่อการจอง",
+                  } as Record<string, string>
+                )[k] || k}
+              </dt>
+              <dd>{normalized}</dd>
+            </div>
+          );
+        })}
     </dl>
   );
 }

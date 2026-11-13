@@ -12,6 +12,7 @@ async function main() {
       key: "primary",
       displayName: "มงคลบาร์",
       logo: oneVentOneLogo,
+      holdMinutes: 5,
       theme: {
         background: "#0B0B0F",
         panel: "#18181B",
@@ -40,6 +41,37 @@ async function main() {
       },
     },
   });
+  const currentProfile = await prisma.businessProfile.findUnique({
+    where: { key: "primary" },
+  });
+  if (currentProfile) {
+    const policy =
+      (currentProfile.bookingPolicy as Record<string, unknown> | null) ?? {};
+    const terms =
+      typeof policy.terms === "string"
+        ? policy.terms.replace(/ภายใน\s*15\s*นาที/g, "ภายใน 5 นาที")
+        : policy.terms;
+    const holdMinutes =
+      Number(policy.holdMinutes) === 15 ? 5 : (policy.holdMinutes ?? 5);
+    if (
+      currentProfile.holdMinutes === 15 ||
+      policy.holdMinutes === 15 ||
+      terms !== policy.terms
+    ) {
+      await prisma.businessProfile.update({
+        where: { key: "primary" },
+        data: {
+          holdMinutes:
+            currentProfile.holdMinutes === 15 ? 5 : currentProfile.holdMinutes,
+          bookingPolicy: {
+            ...policy,
+            holdMinutes,
+            terms,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+  }
   const now = new Date();
   const startsAt = new Date(now.getTime() + 30 * 86400000);
   startsAt.setUTCHours(13, 0, 0, 0);

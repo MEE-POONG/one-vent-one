@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getBusinessProfile, getEventBySlug } from "@/server/services/catalog";
 import { JsonFacts, Status } from "@/components/ui";
+import { EventCountdown } from "@/features/events/event-countdown";
 import { dateTime, money } from "@/lib/format";
 import type { Business, EventData } from "@/lib/client-types";
 import { notFound } from "next/navigation";
@@ -98,81 +99,99 @@ export default async function EventPage({
                 <span /> BOOKING POLICY
               </div>
               <h2 style={{ marginTop: 10, marginBottom: 16 }}>
-                ข้อกำหนดก่อนจองบัตร
+                ข้อกำหนดก่อนจองโต๊ะ
               </h2>
               <JsonFacts value={business?.bookingPolicy} />
               <div className="notice" style={{ marginTop: 16 }}>
                 <ShieldCheck size={19} style={{ color: "#d71920" }} />
                 <p>
-                  เมื่อสร้างการจอง คุณมีเวลา {business?.holdMinutes || 5}{" "}
+                  เมื่อสร้างการจองโต๊ะ คุณมีเวลา{" "}
+                  {business?.holdMinutes && business.holdMinutes !== 15
+                    ? business.holdMinutes
+                    : 5}{" "}
                   นาทีเพื่อชำระเงินผ่าน QR Code ให้เสร็จสิ้นภายในเวลาที่กำหนด
                 </p>
               </div>
             </section>
           </div>
 
-          <aside className="panel sticky-panel customer-sticky-card">
-            <div className="section-kicker">
-              <span /> SELECT ZONE
-            </div>
-            <h2 style={{ marginTop: 10, marginBottom: 18 }}>
-              เลือกประสบการณ์ของคุณ
-            </h2>
+          <aside className="stack sticky-panel event-detail-aside">
+            <EventCountdown startsAt={event.startsAt} endsAt={event.endsAt} />
 
-            <div className="zone-tier-list">
-              {event.zones?.map((zone) => (
-                <div key={zone.id} className="zone-tier-card">
-                  <div>
-                    <strong>{zone.name}</strong>
-                    <small>
-                      {zone.sellingMode === "TABLE"
-                        ? "จองทั้งโต๊ะ"
-                        : zone.sellingMode === "SEAT"
-                          ? "เลือกที่นั่ง"
-                          : "บัตรเข้าชมทั่วไป"}
-                    </small>
-                    {zone.sellingMode === "TABLE" && zone.units?.[0] ? (
-                      <small>
-                        1 โต๊ะ · เข้าได้ {zone.units[0].admissionCount} คน
-                      </small>
-                    ) : null}
-                  </div>
-                  <strong className="zone-tier-price">
-                    {(() => {
-                      const prices = [
-                        ...(zone.units || []),
-                        ...(zone.ticketTypes || []),
-                      ].map((t) => t.priceSatang);
-                      return prices.length ? money(Math.min(...prices)) : "—";
-                    })()}
-                  </strong>
-                </div>
-              ))}
-            </div>
-
-            <div className="sale-window-box">
-              <Clock3 size={16} />
-              <div>
-                <span>ช่วงเวลาจำหน่ายบัตร</span>
-                <small>
-                  เปิดขาย {dateTime(event.saleStartsAt)}
-                  <br />
-                  ถึง {dateTime(event.saleEndsAt)}
-                </small>
+            <div className="panel customer-sticky-card">
+              <div className="section-kicker">
+                <span /> SELECT ZONE
               </div>
-            </div>
+              <h2 style={{ marginTop: 10, marginBottom: 18 }}>
+                เลือกโซนโต๊ะของคุณ
+              </h2>
 
-            {event.status === "PUBLISHED" ? (
-              <Link
-                className="mongkol-button button-wide"
-                href={`/events/${event.slug}/booking`}
-              >
-                <Ticket size={18} />
-                เลือกโต๊ะ / บัตร <ArrowRight size={18} />
-              </Link>
-            ) : (
-              <p className="notice">ขณะนี้อีเวนต์ไม่เปิดรับการจอง</p>
-            )}
+              <div className="zone-tier-list">
+                {(() => {
+                  const allZones = event.zones ?? [];
+                  const tableZones = allZones.filter(
+                    (zone) => zone.sellingMode === "TABLE",
+                  );
+                  const displayZones = tableZones.length ? tableZones : allZones;
+                  return displayZones.map((zone) => {
+                    const seatCounts = Array.from(
+                      new Set((zone.units || []).map((u) => u.admissionCount)),
+                    ).sort((a, b) => a - b);
+                    return (
+                      <div key={zone.id} className="zone-tier-card">
+                        <div>
+                          <strong>{zone.name}</strong>
+                          <small>จองเป็นรายโต๊ะ (Table Only)</small>
+                          {seatCounts.length ? (
+                            <small>
+                              1 โต๊ะ · เข้าได้{" "}
+                              {seatCounts.length === 1
+                                ? `${seatCounts[0]} ที่นั่ง`
+                                : `${seatCounts[0]}–${seatCounts[seatCounts.length - 1]} ที่นั่ง`}
+                            </small>
+                          ) : null}
+                        </div>
+                        <strong className="zone-tier-price">
+                          {(() => {
+                            const prices = [
+                              ...(zone.units || []),
+                              ...(zone.ticketTypes || []),
+                            ].map((t) => t.priceSatang);
+                            return prices.length
+                              ? money(Math.min(...prices))
+                              : "—";
+                          })()}
+                        </strong>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              <div className="sale-window-box">
+                <Clock3 size={16} />
+                <div>
+                  <span>ช่วงเวลาเปิดจองโต๊ะ</span>
+                  <small>
+                    เปิดจอง {dateTime(event.saleStartsAt)}
+                    <br />
+                    ถึง {dateTime(event.saleEndsAt)}
+                  </small>
+                </div>
+              </div>
+
+              {event.status === "PUBLISHED" ? (
+                <Link
+                  className="mongkol-button button-wide"
+                  href={`/events/${event.slug}/booking`}
+                >
+                  <Ticket size={18} />
+                  เลือกโต๊ะ <ArrowRight size={18} />
+                </Link>
+              ) : (
+                <p className="notice">ขณะนี้อีเวนต์ไม่เปิดรับการจอง</p>
+              )}
+            </div>
           </aside>
         </div>
       </div>
