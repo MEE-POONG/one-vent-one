@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import { useMutation, useResource } from "@/lib/client-api";
 import type { Business } from "@/lib/client-types";
 import { ErrorNotice, Field, Loading, PageHeading } from "@/components/ui";
+import { ImageField } from "./image-field";
 
 type Settings = Business & {
   reviewHours: number;
@@ -26,13 +28,16 @@ function SettingsForm({
   onSaved: () => Promise<void>;
 }) {
   const mutation = useMutation();
+  const router = useRouter();
   const [saved, setSaved] = useState(false);
+  const [imagePending, setImagePending] = useState(false);
   return (
     <form
       className="stack"
       onChange={() => setSaved(false)}
       onSubmit={async (e) => {
         e.preventDefault();
+        if (imagePending || mutation.pending) return;
         const form = new FormData(e.currentTarget);
         const field = (name: string) => String(form.get(name) ?? "").trim();
         const payload = {
@@ -64,6 +69,7 @@ function SettingsForm({
           await mutation.run("/api/admin/business-profile", payload, "PATCH");
           setSaved(true);
           await onSaved();
+          router.refresh();
         } catch {}
       }}
     >
@@ -78,14 +84,15 @@ function SettingsForm({
               defaultValue={value.displayName}
             />
           </Field>
-          <Field label="URL โลโก้">
-            <input
-              name="logo"
-              maxLength={500}
-              defaultValue={value.logo ?? ""}
-              placeholder="https://… หรือ /logo.png"
-            />
-          </Field>
+          <ImageField
+            name="logo"
+            label="โลโก้ร้าน"
+            kind="logo"
+            initialValue={value.logo ?? ""}
+            disabled={mutation.pending}
+            onPendingChange={setImagePending}
+            onChange={() => setSaved(false)}
+          />
           <Field label="โทรศัพท์">
             <input
               name="phone"
@@ -228,7 +235,7 @@ function SettingsForm({
         </p>
       ) : null}
       <div className="actions">
-        <button className="button" disabled={mutation.pending}>
+        <button className="button" disabled={mutation.pending || imagePending}>
           <Save size={18} />
           {mutation.pending ? "กำลังบันทึก" : "บันทึกการตั้งค่า"}
         </button>

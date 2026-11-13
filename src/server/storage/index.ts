@@ -10,7 +10,7 @@ import { hasRole } from "@/server/permissions";
 import { ownedBooking } from "@/server/services/booking";
 import { idempotent } from "@/server/services/idempotency";
 
-function storageRoot() {
+export function storageRoot() {
   if (
     process.env.NODE_ENV === "production" &&
     process.env.STORAGE_PERSISTENT !== "true"

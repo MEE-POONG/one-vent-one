@@ -36,7 +36,7 @@ export default async function RootLayout({
         <a className="skip-link" href="#main-content">
           ข้ามไปยังเนื้อหา
         </a>
-        <SiteHeader />
+        <SiteHeader businessName={business?.displayName} logo={logo} />
         <main id="main-content">{children}</main>
         <footer className="site-footer">
           <div>

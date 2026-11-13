@@ -1866,8 +1866,8 @@ td small {
 /* Current Mongkol palette: red and black only. */
 .mongkol-page { --mongkol-red: #d71920; --mongkol-gold: #d71920; color: #f7f4f4; font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif; }
 .mongkol-brand, .menu-logo, .mongkol-hero h1, .stats-grid strong, .mongkol-section-head h2 { font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif; font-weight: 800; letter-spacing: -.035em; }
-.mongkol-brand { display: flex; align-items: center; width: 150px; height: 52px; overflow: hidden; }
-.mongkol-brand img { width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.03); }
+.mongkol-brand { display: flex; align-items: center; width: 150px; height: 50px; overflow: hidden; }
+.mongkol-brand img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .mongkol-brand span, .menu-logo span, .mongkol-header nav a:hover, .mobile-menu small, .eyebrow, .section-kicker, .all-events, .event-card-price strong, .event-card-venue svg { color: var(--mongkol-red); }
 .mongkol-header .header-auth, .view-all-button { border-color: var(--mongkol-red); }.mobile-menu { border-left-color: #d7192070; }.menu-login, .mongkol-button, .event-card-cta { background: #d71920; box-shadow: 0 12px 30px #d719204d; }.mongkol-header .header-auth:hover, .view-all-button:hover, .event-card-cta:hover { background: #a90f16; border-color: #a90f16; }.orb-two { background: #d71920; }.hero-title, .event-finder label { color: #f1f1f1; }.hero-pager button.active, .section-kicker span { background: var(--mongkol-red); }.event-finder { border-color: #d7192045; }.stats-section { border-color: #d7192030; }.stats-grid span { color: #e9e9e9; }.stats-grid small { color: #d71920; }.mongkol-event:hover { border-color: #d7192099; }
 .mongkol-event-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }.mongkol-event { background: transparent; border: 0; border-radius: 20px; overflow: visible; }.mongkol-event .event-card { height: 100%; border-color: #ffffff1c; background: #110d0e; }.mongkol-event .event-card:hover { border-color: #d719208c; }.mongkol-event .event-card-poster { aspect-ratio: 2 / 3; }.mongkol-event .event-card-date { border-color: #d7192080; }.mongkol-event .event-card-content { padding-bottom: 22px; }.mongkol-event .event-card-cta { background: #d71920; }.mongkol-event .event-card-tags span { color: #f1e8e8; }.event-card h3 a:hover { color: #ec343a; }
@@ -1902,7 +1902,7 @@ td small {
 .header-search-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .header-search-item { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 14px; border: 1px solid #27272e; background: #121216; transition: border-color .2s, background .2s, transform .2s; }
 .header-search-item:hover { border-color: #d71920; background: #18181d; transform: translateY(-2px); }
-.header-search-item img { width: 48px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.header-search-item img { width: 48px; height: 72px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 .header-search-item-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .header-search-item-info strong { font-size: 15px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .header-search-item-info span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #a1a1aa; }
@@ -2211,6 +2211,23 @@ td small {
 .vticket-security-item strong.text-invalid { color: #fca5a5; }
 .vticket-security-item span { display: block; color: #d4d4d8; font-size: 11px; line-height: 1.35; }
 .vticket-security-item code { display: inline-block; margin-top: 3px; padding: 2px 7px; border-radius: 6px; background: #09090eb3; border: 1px solid #ffffff1f; color: #ffffff; font-size: 10.5px; }
+.admin-image-field { min-width: 0; }
+.admin-image-preview { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 240px; aspect-ratio: 2 / 3; overflow: hidden; border: 1px solid #35353D; border-radius: 10px; background: #0B0B0F; }
+.admin-image-preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.admin-image-preview > span { padding: 16px; text-align: center; }
+.admin-image-preview.is-logo { max-width: 360px; aspect-ratio: 3 / 1; }
+.admin-image-preview.is-logo img { object-fit: contain; }
+.admin-image-recommendation { color: #F4F4F5; font-weight: 600; }
+.admin-image-size, .admin-image-design-tip { font-size: 12px; line-height: 1.7; }
+.admin-image-size { max-width: 560px; }
+.admin-image-advice { color: #FCD34D; }
+.admin-image-picker { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: fit-content; max-width: 100%; padding: 10px 14px; border: 1px solid #35353D; border-radius: 10px; cursor: pointer; }
+.admin-image-picker input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.admin-image-picker:focus-within { outline: 2px solid #E11D48; outline-offset: 3px; }
+.admin-image-picker:has(input:disabled) { opacity: .55; cursor: wait; }
+.admin-image-field > button { width: fit-content; }
+.admin-image-field summary { cursor: pointer; color: #D4D4D8; }
+.admin-image-field details[open] summary { margin-bottom: 10px; }
 @media (max-width: 760px) {
   .vticket-card-3d { aspect-ratio: auto; min-height: 0; }
   .vticket-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

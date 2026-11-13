@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Plus, Pencil, Map, Copy, Trash2 } from "lucide-react";
 import { useMutation, useResource } from "@/lib/client-api";
 import type { EventData, PageData } from "@/lib/client-types";
+import { ImageField } from "./image-field";
 import {
   dateTime,
   Empty,
@@ -156,12 +157,15 @@ const dateInput = (value?: string) =>
 function EventForm({
   event,
   template,
+  onSaved,
 }: {
   event?: EventData;
   template?: EventData;
+  onSaved?: () => Promise<void>;
 }) {
   const router = useRouter();
   const mutation = useMutation();
+  const [imagePending, setImagePending] = useState(false);
   const initial: Partial<EventData> | undefined =
     event ??
     (template && {
@@ -169,22 +173,21 @@ function EventForm({
       title: `${template.title} (รอบใหม่)`.slice(0, 160),
       slug: `${template.slug}-2`.slice(0, 100),
     });
-  const fields = ["title", "slug", "venue", "posterUrl"] as const;
+  const fields = ["title", "slug", "venue"] as const;
   const labels = {
     title: "ชื่ออีเวนท์",
     slug: "ชื่อในลิงก์ (ภาษาอังกฤษ)",
     venue: "สถานที่",
-    posterUrl: "URL ภาพโปสเตอร์",
   };
   const hints: Partial<Record<(typeof fields)[number], string>> = {
     slug: "a-z, 0-9 และ - เท่านั้น ต้องไม่ซ้ำกับงานอื่น",
-    posterUrl: "ใช้ HTTPS หรือไฟล์ในเว็บไซต์ เช่น /concert-hero.png",
   };
   return (
     <form
       className="panel stack"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (imagePending || mutation.pending) return;
         const form = new FormData(e.currentTarget);
         const payload = {
           title: String(form.get("title")),
@@ -214,6 +217,7 @@ function EventForm({
             payload,
             event ? "PATCH" : "POST",
           );
+          if (event) await onSaved?.();
           router.push(`/admin/events/${result.id}`);
           router.refresh();
         } catch {}
@@ -232,13 +236,23 @@ function EventForm({
           <Field key={field} label={labels[field]} hint={hints[field]}>
             <input
               name={field}
-              required={field !== "posterUrl"}
+              required
               defaultValue={initial?.[field] || ""}
               maxLength={field === "title" ? 160 : field === "slug" ? 100 : 500}
               pattern={field === "slug" ? "[a-z0-9]+(-[a-z0-9]+)*" : undefined}
             />
           </Field>
         ))}
+        <div className="full">
+          <ImageField
+            name="posterUrl"
+            label="ภาพโปสเตอร์อีเวนท์"
+            kind="poster"
+            initialValue={initial?.posterUrl || ""}
+            disabled={mutation.pending}
+            onPendingChange={setImagePending}
+          />
+        </div>
         <div className="full">
           <Field label="ศิลปิน (คั่นด้วยเครื่องหมายจุลภาค)">
             <input
@@ -279,7 +293,11 @@ function EventForm({
       </p>
       <ErrorNotice error={mutation.error} />
       <div className="actions">
-        <button type="submit" className="button" disabled={mutation.pending}>
+        <button
+          type="submit"
+          className="button"
+          disabled={mutation.pending || imagePending}
+        >
           {mutation.pending
             ? "กำลังบันทึก"
             : template
@@ -505,6 +523,7 @@ export function EventEditor({ id, from }: { id?: string; from?: string }) {
           key={event?.version ?? template?.id ?? "new"}
           event={event || undefined}
           template={template || undefined}
+          onSaved={id ? resource.reload : undefined}
         />
       )}
       {event ? (

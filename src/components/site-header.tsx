@@ -17,7 +17,13 @@ const menuItems = [
   ["ตรวจสอบการจอง", "/account/bookings", ""],
 ] as const;
 
-export function SiteHeader() {
+export function SiteHeader({
+  businessName = "Mongkol Bar",
+  logo = null,
+}: {
+  businessName?: string;
+  logo?: string | null;
+}) {
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -91,7 +97,24 @@ export function SiteHeader() {
 
   return <header className="site-header mongkol-header">
     <div className="header-inner">
-      <Link href="/" className="brand mongkol-brand" aria-label="Mongkol Bar หน้าแรก" onClick={(e) => navigateToSection(e, "home")}><Image src="/mongkol-logo.png" alt="Mongkol Bar" width={180} height={60} priority /></Link>
+      <Link
+        href="/"
+        className="brand mongkol-brand"
+        aria-label={`${businessName} หน้าแรก`}
+        onClick={(e) => navigateToSection(e, "home")}
+      >
+        {logo ? (
+          <Image
+            src={logo}
+            alt={`โลโก้ ${businessName}`}
+            width={180}
+            height={60}
+            unoptimized
+            priority
+            style={{ objectFit: "contain" }}
+          />
+        ) : businessName}
+      </Link>
       <nav aria-label="เมนูหลัก">
         <Link href="/" onClick={(e) => navigateToSection(e, "home")}>หน้าแรก</Link>
         <Link href="/#events" onClick={(e) => navigateToSection(e, "events")}>อีเวนต์</Link>
@@ -151,7 +174,7 @@ export function SiteHeader() {
                         src={event.posterUrl || "/concert-hero.png"}
                         alt=""
                         width={48}
-                        height={64}
+                        height={72}
                         unoptimized={!!event.posterUrl?.startsWith("https:")}
                       />
                       <div className="header-search-item-info">
