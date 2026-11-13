@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { SiteHeader } from "@/components/site-header";
 import { getBusinessProfile } from "@/server/services/catalog";
+import { oneVentOneLogo } from "@/shared/images";
 import "./globals.css";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -51,10 +52,10 @@ export default async function RootLayout({
                 <Image
                   src={logo}
                   alt={`โลโก้ ${business.displayName}`}
-                  width={48}
+                  width={logo === oneVentOneLogo ? 144 : 48}
                   height={48}
                   unoptimized
-                  style={{ objectFit: "contain" }}
+                  style={{ objectFit: logo === oneVentOneLogo ? "cover" : "contain" }}
                 />
               ) : null}
               <div>

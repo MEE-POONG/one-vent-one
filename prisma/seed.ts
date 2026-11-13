@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { PrismaClient, type Prisma } from "@prisma/client";
+import { oneVentOneLogo } from "../src/shared/images";
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,7 @@ async function main() {
     create: {
       key: "primary",
       displayName: "มงคลบาร์",
+      logo: oneVentOneLogo,
       theme: {
         background: "#0B0B0F",
         panel: "#18181B",

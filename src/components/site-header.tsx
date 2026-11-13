@@ -9,6 +9,7 @@ import { authClient } from "@/lib/auth-client";
 import { isStaff, rolesOf } from "@/lib/roles";
 import type { EventData, PageData } from "@/lib/client-types";
 import { dateTime } from "@/components/ui";
+import { oneVentOneLogo } from "@/shared/images";
 
 const menuItems = [
   ["หน้าแรก", "/", "home"],
@@ -111,7 +112,7 @@ export function SiteHeader({
             height={60}
             unoptimized
             priority
-            style={{ objectFit: "contain" }}
+            style={{ objectFit: logo === oneVentOneLogo ? "cover" : "contain" }}
           />
         ) : businessName}
       </Link>

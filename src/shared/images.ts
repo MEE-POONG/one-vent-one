@@ -1,3 +1,5 @@
+export const oneVentOneLogo = "/oneventone-logo.png";
+
 export const imageGuidelines = {
   poster: {
     width: 1200,
