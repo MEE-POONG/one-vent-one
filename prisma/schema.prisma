@@ -169,6 +169,7 @@ model Event {
   artists                  String[]
   venue                    String
   posterUrl                String?
+  artistImageUrl           String?
   startsAt                 DateTime
   endsAt                   DateTime
   saleStartsAt             DateTime

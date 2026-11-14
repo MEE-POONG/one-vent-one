@@ -222,7 +222,9 @@ function EventForm({
 }) {
   const router = useRouter();
   const mutation = useMutation();
-  const [imagePending, setImagePending] = useState(false);
+  const [posterPending, setPosterPending] = useState(false);
+  const [artistPending, setArtistPending] = useState(false);
+  const imagePending = posterPending || artistPending;
   const isBlankNew = !event && !template;
 
   const initial: Partial<EventData> | undefined =
@@ -293,7 +295,8 @@ function EventForm({
             .map((v) => v.trim())
             .filter(Boolean),
           venue: venueVal.trim(),
-          posterUrl: String(form.get("posterUrl")),
+          posterUrl: String(form.get("posterUrl") ?? ""),
+          artistImageUrl: String(form.get("artistImageUrl") ?? ""),
           startsAt: new Date(`${startsAtVal}+07:00`).toISOString(),
           endsAt: new Date(`${endsAtVal}+07:00`).toISOString(),
           saleStartsAt: new Date(`${saleStartsAtVal}+07:00`).toISOString(),
@@ -492,11 +495,21 @@ function EventForm({
         <div className="full">
           <ImageField
             name="posterUrl"
-            label="ภาพโปสเตอร์อีเวนท์"
+            label="ภาพโปสเตอร์ / ฉากหลังอีเวนท์"
             kind="poster"
             initialValue={initial?.posterUrl || ""}
             disabled={mutation.pending}
-            onPendingChange={setImagePending}
+            onPendingChange={setPosterPending}
+          />
+        </div>
+        <div className="full">
+          <ImageField
+            name="artistImageUrl"
+            label="ภาพศิลปินไดคัท (PNG พื้นหลังโปร่งใส · ไม่บังคับ)"
+            kind="artist"
+            initialValue={initial?.artistImageUrl || ""}
+            disabled={mutation.pending}
+            onPendingChange={setArtistPending}
           />
         </div>
         <div className="full">

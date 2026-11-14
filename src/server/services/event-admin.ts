@@ -39,47 +39,73 @@ export const ACTIVE_BOOKING_STATUSES = [
   "CONFIRMED",
 ] as const;
 export async function attachShowInSlider<
-  T extends { slug: string; showInSlider?: boolean },
->(items: T[]): Promise<(T & { showInSlider: boolean })[]> {
+  T extends {
+    slug: string;
+    showInSlider?: boolean;
+    artistImageUrl?: string | null;
+  },
+>(
+  items: T[],
+): Promise<(T & { showInSlider: boolean; artistImageUrl: string | null })[]> {
+  type Out = T & { showInSlider: boolean; artistImageUrl: string | null };
   if (items.length === 0) return [];
-  if (items.every((item) => typeof item.showInSlider === "boolean")) {
-    return items as (T & { showInSlider: boolean })[];
-  }
+  // artistImageUrl is read raw so it works even before `prisma generate` runs.
   const raw = (await prisma.$runCommandRaw({
     find: "Event",
     filter: { slug: { $in: items.map((item) => item.slug) } },
-    projection: { slug: 1, showInSlider: 1 },
+    projection: { slug: 1, showInSlider: 1, artistImageUrl: 1 },
   })) as {
-    cursor?: { firstBatch?: Array<{ slug?: string; showInSlider?: boolean }> };
+    cursor?: {
+      firstBatch?: Array<{
+        slug?: string;
+        showInSlider?: boolean;
+        artistImageUrl?: string | null;
+      }>;
+    };
   };
-  const map = new Map<string, boolean>();
+  const map = new Map<
+    string,
+    { showInSlider: boolean; artistImageUrl: string | null }
+  >();
   for (const doc of raw.cursor?.firstBatch ?? []) {
     if (typeof doc.slug === "string") {
-      map.set(doc.slug, Boolean(doc.showInSlider));
+      map.set(doc.slug, {
+        showInSlider: Boolean(doc.showInSlider),
+        artistImageUrl:
+          typeof doc.artistImageUrl === "string" && doc.artistImageUrl
+            ? doc.artistImageUrl
+            : null,
+      });
     }
   }
-  return items.map((item) => ({
-    ...item,
-    showInSlider:
-      typeof item.showInSlider === "boolean"
-        ? item.showInSlider
-        : Boolean(map.get(item.slug)),
-  }));
+  return items.map((item) => {
+    const found = map.get(item.slug);
+    return {
+      ...item,
+      showInSlider:
+        typeof item.showInSlider === "boolean"
+          ? item.showInSlider
+          : Boolean(found?.showInSlider),
+      artistImageUrl: found?.artistImageUrl ?? item.artistImageUrl ?? null,
+    } as Out;
+  });
 }
 
 export async function setEventShowInSlider(
   tx: Prisma.TransactionClient,
   slug: string,
   showInSlider?: boolean,
+  artistImageUrl?: string | null,
 ) {
+  const $set: Prisma.InputJsonObject = {
+    showInSlider: Boolean(showInSlider),
+    ...(artistImageUrl !== undefined
+      ? { artistImageUrl: artistImageUrl || null }
+      : {}),
+  };
   await tx.$runCommandRaw({
     update: "Event",
-    updates: [
-      {
-        q: { slug },
-        u: { $set: { showInSlider: Boolean(showInSlider) } },
-      },
-    ],
+    updates: [{ q: { slug }, u: { $set } }],
   });
 }
 
@@ -191,7 +217,12 @@ export async function createEvent(
   return idempotent(actor.id, "event:create", key, input, async (tx) => {
     await assertSlugFree(tx, input.slug);
     const event = await tx.event.create({ data: eventData(input) });
-    await setEventShowInSlider(tx, input.slug, input.showInSlider);
+    await setEventShowInSlider(
+      tx,
+      input.slug,
+      input.showInSlider,
+      input.artistImageUrl ?? null,
+    );
     await tx.layoutTemplate.create({
       data: {
         eventId: event.id,
@@ -202,7 +233,11 @@ export async function createEvent(
       },
     });
     await audit(tx, actor.id, "EVENT_CREATE", "Event", event.id);
-    return { ...event, showInSlider: Boolean(input.showInSlider) };
+    return {
+      ...event,
+      showInSlider: Boolean(input.showInSlider),
+      artistImageUrl: input.artistImageUrl || null,
+    };
   });
 }
 export async function editEvent(
@@ -230,10 +265,19 @@ export async function editEvent(
       "VERSION_CONFLICT",
       "มีการแก้ไขงานจากหน้าต่างอื่น กรุณาโหลดใหม่",
     );
-    await setEventShowInSlider(tx, fields.slug, fields.showInSlider);
+    await setEventShowInSlider(
+      tx,
+      fields.slug,
+      fields.showInSlider,
+      fields.artistImageUrl ?? null,
+    );
     await audit(tx, actor.id, "EVENT_UPDATE", "Event", id);
     const updated = await tx.event.findUniqueOrThrow({ where: { id } });
-    return { ...updated, showInSlider: Boolean(fields.showInSlider) };
+    return {
+      ...updated,
+      showInSlider: Boolean(fields.showInSlider),
+      artistImageUrl: fields.artistImageUrl || null,
+    };
   });
 }
 export async function changeEventStatus(

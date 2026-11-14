@@ -8,7 +8,13 @@ import {
   MapPin,
   Ticket as TicketIcon,
 } from "lucide-react";
-import type { HTMLAttributes, ReactNode } from "react";
+import { useRef } from "react";
+import type {
+  CSSProperties,
+  HTMLAttributes,
+  MouseEvent,
+  ReactNode,
+} from "react";
 import { ApiError } from "@/lib/client-api";
 import type { EventData } from "@/lib/client-types";
 
@@ -168,7 +174,26 @@ export function Highlight({
     </div>
   );
 }
+// Fixed particle positions (percent of the poster) so server and client render
+// the same markup. They sit behind the artist layer and only show on hover.
+const CARD_PARTICLES: ReadonlyArray<readonly [number, number, number, number]> =
+  [
+    // left %, top %, size px, delay s
+    [12, 72, 5, 0],
+    [22, 48, 3, 0.6],
+    [16, 26, 4, 1.2],
+    [34, 16, 3, 0.3],
+    [52, 10, 5, 0.9],
+    [70, 18, 3, 1.5],
+    [84, 34, 4, 0.2],
+    [88, 58, 3, 1.1],
+    [78, 78, 5, 0.7],
+    [30, 84, 3, 1.4],
+  ];
+
 export function EventCard({ event }: { event: EventData }) {
+  const shineRef = useRef<HTMLSpanElement>(null);
+  const shoneRef = useRef(false);
   const startsAt = new Date(event.startsAt);
   const day = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -187,20 +212,105 @@ export function EventCard({ event }: { event: EventData }) {
   const modes = [...new Set(event.zones?.map((zone) => zone.sellingMode))];
   const detailsHref = event.slug ? `/events/${event.slug}` : "/events";
   const isPublished = event.status === "PUBLISHED";
+  const artistSrc = event.artistImageUrl || "";
+
+  // Write pointer CSS variables immediately so even a quick pass tilts smoothly.
+  function applyPointer(e: MouseEvent<HTMLElement>) {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    el.style.setProperty("--card-rx", `${((0.5 - y) * 7).toFixed(2)}deg`);
+    el.style.setProperty("--card-ry", `${((x - 0.5) * 9).toFixed(2)}deg`);
+    el.style.setProperty("--card-mx", `${(x * 100).toFixed(1)}%`);
+    el.style.setProperty("--card-my", `${(y * 100).toFixed(1)}%`);
+    el.style.setProperty("--card-dx", (x - 0.5).toFixed(3));
+    el.style.setProperty("--card-dy", (y - 0.5).toFixed(3));
+  }
+  function triggerShine() {
+    shoneRef.current = true;
+    const shine = shineRef.current;
+    if (!shine) return;
+    shine.classList.remove("is-shining");
+    shine.getBoundingClientRect();
+    shine.classList.add("is-shining");
+  }
+  function onEnter(e: MouseEvent<HTMLElement>) {
+    applyPointer(e);
+    triggerShine();
+  }
+  function onMove(e: MouseEvent<HTMLElement>) {
+    applyPointer(e);
+    if (!shoneRef.current) triggerShine();
+  }
+  function onLeave(e: MouseEvent<HTMLElement>) {
+    shoneRef.current = false;
+    const el = e.currentTarget;
+    for (const name of [
+      "--card-rx",
+      "--card-ry",
+      "--card-mx",
+      "--card-my",
+      "--card-dx",
+      "--card-dy",
+    ])
+      el.style.removeProperty(name);
+  }
+
   return (
-    <article className="event-card">
+    <article
+      className={`event-card${artistSrc ? " has-artist" : ""}`}
+      onMouseEnter={onEnter}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+    >
       <Link
         className="event-card-poster"
         href={detailsHref}
         aria-label={`ดู ${event.title}`}
       >
-        <Image
-          src={event.posterUrl || "/concert-hero.png"}
-          alt=""
-          fill
-          sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 384px"
-          unoptimized={!!event.posterUrl?.startsWith("https:")}
-        />
+        <span className="event-card-layer event-card-bg" aria-hidden="true">
+          <Image
+            src={event.posterUrl || "/concert-hero.png"}
+            alt=""
+            fill
+            sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 384px"
+            unoptimized={!!event.posterUrl?.startsWith("https:")}
+          />
+        </span>
+        <span className="event-card-layer event-card-aura" aria-hidden="true" />
+        <span
+          className="event-card-layer event-card-particles"
+          aria-hidden="true"
+        >
+          {CARD_PARTICLES.map(([left, top, size, delay], i) => (
+            <i
+              key={i}
+              style={
+                {
+                  left: `${left}%`,
+                  top: `${top}%`,
+                  width: size,
+                  height: size,
+                  animationDelay: `${delay}s`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </span>
+        {artistSrc ? (
+          <span className="event-card-artist" aria-hidden="true">
+            <Image
+              src={artistSrc}
+              alt=""
+              fill
+              sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 384px"
+              unoptimized={artistSrc.startsWith("https:")}
+            />
+          </span>
+        ) : null}
+        <span className="event-card-layer event-card-glare" aria-hidden="true" />
         <time
           className="event-card-date"
           dateTime={event.startsAt}
@@ -216,6 +326,12 @@ export function EventCard({ event }: { event: EventData }) {
           {isPublished ? "เปิดขายบัตร" : statusText(event.status)}
         </span>
       </Link>
+      <span
+        ref={shineRef}
+        className="event-card-shine"
+        aria-hidden="true"
+        onAnimationEnd={(e) => e.currentTarget.classList.remove("is-shining")}
+      />
       <div className="event-card-content">
         <h3>
           <Link href={detailsHref}>{event.title}</Link>

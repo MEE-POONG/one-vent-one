@@ -322,7 +322,7 @@ function Tickets({ bookingId }: { bookingId: string }) {
               ticket.remainingAdmissions ?? Math.max(0, totalSeats - checkedIn);
             return (
               <article className="ticket-card" key={ticket.id}>
-                <div className="between" style={{ gap: 10 }}>
+                <div className="between" style={{ gap: 10, flexWrap: "wrap" }}>
                   <h3>{ticket.itemLabel || "บัตรประจำโต๊ะ"}</h3>
                   <Status value={ticket.status} />
                 </div>
@@ -336,6 +336,7 @@ function Tickets({ bookingId }: { bookingId: string }) {
                 </p>
                 {ticket.ticketCode ? (
                   <div
+                    className="ticket-code-row"
                     style={{
                       marginTop: 12,
                       padding: "10px 14px",
@@ -343,6 +344,7 @@ function Tickets({ bookingId }: { bookingId: string }) {
                       background: "#09090eb3",
                       border: "1px solid #ffffff1f",
                       display: "flex",
+                      flexWrap: "wrap",
                       alignItems: "center",
                       justifyContent: "space-between",
                       gap: 10,

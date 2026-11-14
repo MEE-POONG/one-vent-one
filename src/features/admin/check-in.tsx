@@ -274,12 +274,6 @@ export function CheckInDesk() {
                 spellCheck={false}
                 required
                 placeholder="กรอกรหัสบัตร 8 หลัก เช่น MK001482 หรือสแกน QR Code"
-                style={{
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, Menlo, monospace",
-                  fontSize: 16,
-                  letterSpacing: "0.06em",
-                }}
               />
             </Field>
             <div className="actions">

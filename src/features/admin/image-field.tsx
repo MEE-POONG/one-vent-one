@@ -18,7 +18,7 @@ export function ImageField({
 }: {
   name: string;
   label: string;
-  kind: "poster" | "logo";
+  kind: "poster" | "artist" | "logo";
   initialValue?: string;
   disabled?: boolean;
   onPendingChange: (pending: boolean) => void;
@@ -64,7 +64,7 @@ export function ImageField({
         <small>{guideline.placement}</small>
         <input type="hidden" name={name} value={value} />
         <div
-          className={`admin-image-preview ${kind === "logo" ? "is-logo" : ""}`}
+          className={`admin-image-preview ${kind === "logo" ? "is-logo" : ""} ${kind === "artist" ? "is-artist" : ""}`}
         >
           {value && previewable && !broken ? (
             <Image
@@ -91,7 +91,9 @@ export function ImageField({
         <small>
           {kind === "poster"
             ? "ตัวอย่างกรอบการ์ด 2:3 (ครอปกึ่งกลางเหมือนหน้าลูกค้า)"
-            : "ตัวอย่างพื้นที่โลโก้ 3:1 (แสดงเต็มรูป ไม่ครอป)"}
+            : kind === "artist"
+              ? "ตัวอย่างภาพศิลปินบนพื้นตารางหมากรุก (ส่วนโปร่งใสจะเห็นฉากหลังของการ์ด)"
+              : "ตัวอย่างพื้นที่โลโก้ 3:1 (แสดงเต็มรูป ไม่ครอป)"}
         </small>
         <span className="admin-image-picker">
           {pending ? (
@@ -168,7 +170,9 @@ export function ImageField({
             <p className="admin-image-advice">
               {kind === "poster"
                 ? "สัดส่วนรูปต่างจาก 2:3 บางส่วนจะถูกตัดออกตามพรีวิว หากต้องการให้ภาพแสดงครบ ควรเตรียมรูปสัดส่วน 2:3"
-                : "สัดส่วนรูปต่างจาก 3:1 ระบบจะแสดงโลโก้ครบโดยเว้นพื้นที่ว่างตามพรีวิว"}
+                : kind === "artist"
+                  ? "สัดส่วนรูปต่างจาก 2:3 ระบบจะย่อภาพศิลปินให้อยู่ในกรอบโดยยึดชิดขอบล่าง ไม่ครอปตัวศิลปิน"
+                  : "สัดส่วนรูปต่างจาก 3:1 ระบบจะแสดงโลโก้ครบโดยเว้นพื้นที่ว่างตามพรีวิว"}
             </p>
           ) : null}
         </div>

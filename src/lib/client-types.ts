@@ -94,6 +94,7 @@ export interface EventData {
   artists: string[];
   venue: string;
   posterUrl?: string | null;
+  artistImageUrl?: string | null;
   startsAt: string;
   endsAt: string;
   saleStartsAt: string;

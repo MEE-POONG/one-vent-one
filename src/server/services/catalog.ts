@@ -76,12 +76,13 @@ const eventInclude = {
   publishedLayoutVersion: true,
 } satisfies Prisma.EventInclude;
 export async function getEventBySlug(slug: string) {
-  const event = await prisma.event.findUnique({
+  const rawEvent = await prisma.event.findUnique({
     where: { slug },
     include: eventInclude,
   });
-  if (!event || event.status === "DRAFT")
+  if (!rawEvent || rawEvent.status === "DRAFT")
     throw new DomainError("NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
+  const [event] = await attachShowInSlider([rawEvent]);
   return { ...event, layout: event.publishedLayoutVersion };
 }
 export async function getEventById(id: string) {

@@ -23,7 +23,7 @@ export const POST = api(async (request) => {
     new Uint8Array(await readBody(request, 5 * 1024 * 1024 + 64 * 1024)).buffer,
     { headers: { "content-type": type } },
   ).formData();
-  const kind = z.enum(["poster", "logo"]).parse(data.get("kind"));
+  const kind = z.enum(["poster", "artist", "logo"]).parse(data.get("kind"));
   const file = data.get("file");
   invariant(
     file instanceof File,

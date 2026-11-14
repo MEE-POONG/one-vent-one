@@ -32,6 +32,13 @@ export const eventFields = z.object({
       z.url({ protocol: /^https$/ }),
     ])
     .optional(),
+  artistImageUrl: z
+    .union([
+      z.literal(""),
+      z.string().regex(/^\/(?!\/)[A-Za-z0-9/_.-]+$/),
+      z.url({ protocol: /^https$/ }),
+    ])
+    .optional(),
   startsAt: date,
   endsAt: date,
   saleStartsAt: date,

@@ -74,9 +74,10 @@ export function VenueView({
   const recomputeFit = useCallback(() => {
     const el = scrollRef.current;
     if (!el || !layout.width) return;
-    const availableWidth = Math.max(260, el.clientWidth - 28);
+    const gutter = el.clientWidth < 480 ? 16 : 28;
+    const availableWidth = Math.max(180, el.clientWidth - gutter);
     const ratio = availableWidth / layout.width;
-    const clamped = Math.min(1.15, Math.max(0.28, Number(ratio.toFixed(3))));
+    const clamped = Math.min(1.15, Math.max(0.18, Number(ratio.toFixed(3))));
     setFitScale(clamped);
   }, [layout.width]);
 

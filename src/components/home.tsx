@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -36,23 +36,9 @@ type HeroSlideItem = {
   bookingHref: string;
 };
 
+// The 3D tilt now lives inside EventCard; this wrapper only keeps the grid styling.
 function Tilt({ children }: { children: React.ReactNode }) {
-  function move(event: MouseEvent<HTMLDivElement>) {
-    const box = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - box.left) / box.width - 0.5;
-    const y = (event.clientY - box.top) / box.height - 0.5;
-    event.currentTarget.style.setProperty("--tilt-x", `${y * -5}deg`);
-    event.currentTarget.style.setProperty("--tilt-y", `${x * 6}deg`);
-  }
-  function reset(event: MouseEvent<HTMLDivElement>) {
-    event.currentTarget.style.setProperty("--tilt-x", "0deg");
-    event.currentTarget.style.setProperty("--tilt-y", "0deg");
-  }
-  return (
-    <div className="mongkol-event" onMouseMove={move} onMouseLeave={reset}>
-      {children}
-    </div>
-  );
+  return <div className="mongkol-event">{children}</div>;
 }
 
 export function Home({ events, venueName }: Props) {
@@ -353,19 +339,24 @@ export function Home({ events, venueName }: Props) {
               </span>
             </a>
 
-            <div className="contact-card contact-card-placeholder" aria-label="ช่องทางติดต่อเพิ่มเติม (เว้นไว้ก่อน)">
+            <a href="#contact" className="contact-card">
               <div className="contact-card-top">
                 <div className="contact-card-icon" aria-hidden="true">
-                  <span>+</span>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+                  </svg>
                 </div>
-                <span className="contact-card-badge">RESERVED</span>
+                <span className="contact-card-badge">CLIPS & VIBE</span>
               </div>
               <div className="contact-card-body">
-                <span className="contact-card-label">COMING SOON</span>
-                <h3>ช่องทางอื่นๆ</h3>
-                <p>เว้นไว้สำหรับเพิ่มช่องทางติดต่อเพิ่มเติมในอนาคต</p>
+                <span className="contact-card-label">OFFICIAL TIKTOK</span>
+                <h3>TikTok</h3>
+                <p>รับชมคลิปบรรยากาศความสนุก ไฮไลต์ศิลปิน และโมเมนต์สดจากหน้าเวที</p>
               </div>
-            </div>
+              <span className="contact-card-action">
+                ติดตาม TikTok <ArrowRight size={16} />
+              </span>
+            </a>
           </div>
         </div>
       </section>

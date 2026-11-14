@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   CalendarDays,
   Clock3,
@@ -24,23 +24,9 @@ import {
 type TimeFilter = "upcoming" | "past" | "all";
 type SortOption = "date-asc" | "date-desc";
 
+// The 3D tilt now lives inside EventCard; this wrapper only keeps the grid styling.
 function TiltCard({ children }: { children: React.ReactNode }) {
-  function move(event: MouseEvent<HTMLDivElement>) {
-    const box = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - box.left) / box.width - 0.5;
-    const y = (event.clientY - box.top) / box.height - 0.5;
-    event.currentTarget.style.setProperty("--tilt-x", `${y * -5}deg`);
-    event.currentTarget.style.setProperty("--tilt-y", `${x * 6}deg`);
-  }
-  function reset(event: MouseEvent<HTMLDivElement>) {
-    event.currentTarget.style.setProperty("--tilt-x", "0deg");
-    event.currentTarget.style.setProperty("--tilt-y", "0deg");
-  }
-  return (
-    <div className="mongkol-event" onMouseMove={move} onMouseLeave={reset}>
-      {children}
-    </div>
-  );
+  return <div className="mongkol-event">{children}</div>;
 }
 
 function isPastEvent(event: EventData) {

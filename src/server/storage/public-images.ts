@@ -13,7 +13,7 @@ const imageDirectory = () => path.join(storageRoot(), "public-images");
 
 export async function uploadPublicImage(
   actor: Actor,
-  kind: "poster" | "logo",
+  kind: "poster" | "artist" | "logo",
   file: File,
 ) {
   requireRoles(actor, kind === "logo" ? "SUPER_ADMIN" : "ADMIN");
@@ -52,7 +52,8 @@ export async function uploadPublicImage(
         fit: "inside",
         withoutEnlargement: true,
       })
-      .webp({ quality: 85 })
+      // Artist cut-outs keep a lossless alpha channel so transparent edges stay clean.
+      .webp(kind === "artist" ? { quality: 90, alphaQuality: 100 } : { quality: 85 })
       .toBuffer();
   } catch {
     throw new DomainError(

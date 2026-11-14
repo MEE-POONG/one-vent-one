@@ -181,7 +181,12 @@ export async function duplicateEvent(
       invariant(source, "NOT_FOUND", "ไม่พบงานต้นฉบับ", 404);
       await assertSlugFree(tx, input.slug);
       const event = await tx.event.create({ data: eventData(input) });
-      await setEventShowInSlider(tx, input.slug, input.showInSlider);
+      await setEventShowInSlider(
+        tx,
+        input.slug,
+        input.showInSlider,
+        input.artistImageUrl ?? null,
+      );
       const eventId = event.id;
       const zoneIds = new Map(source.zones.map((z) => [z.id, newId()]));
       const poolIds = new Map(source.pools.map((p) => [p.id, newId()]));
