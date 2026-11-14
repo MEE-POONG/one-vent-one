@@ -2,40 +2,308 @@ import "dotenv/config";
 import { PrismaClient, type Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
-const samples = [
+
+export type SampleTableEventConfig = {
+  slug: string;
+  title: string;
+  artists: string[];
+  posterUrl: string;
+  daysAway: number;
+  color: string;
+  description: string;
+  zoneName: string;
+  rows: number;
+  cols: number;
+  frontRows: number;
+  frontSeats: number;
+  frontPriceSatang: number;
+  regularSeats: number;
+  regularPriceSatang: number;
+};
+
+export const sampleTableEvents: SampleTableEventConfig[] = [
   {
     slug: "demo-red-night",
     title: "Red Night Live",
-    artist: "Red Night Band",
-    poster: "red-night",
+    artists: ["Red Night Band", "DJ Crimson"],
+    posterUrl: "/events/red-night.png",
     daysAway: 8,
-    priceSatang: 120000,
     color: "#F04438",
-    description: "ค่ำคืนร็อกสดท่ามกลางแสงสีแดง พร้อมเพลงที่อยากร้องไปด้วยกัน",
+    description:
+      "ค่ำคืนร็อกสดท่ามกลางแสงสีแดง พร้อมเพลงที่อยากร้องไปด้วยกัน เปิดจองเฉพาะรูปแบบโต๊ะสำหรับแก๊งเพื่อน (ทั้งหมด 30 โต๊ะ)",
+    zoneName: "โซนโต๊ะ Red Room",
+    rows: 5,
+    cols: 6,
+    frontRows: 2,
+    frontSeats: 4,
+    frontPriceSatang: 160000,
+    regularSeats: 4,
+    regularPriceSatang: 120000,
   },
   {
     slug: "demo-moonlight-acoustic",
     title: "Moonlight Acoustic",
-    artist: "Moonlight Session",
-    poster: "moonlight-acoustic",
+    artists: ["Moonlight Session", "Nalin Trio"],
+    posterUrl: "/events/moonlight-acoustic.png",
     daysAway: 15,
-    priceSatang: 69000,
     color: "#729BEA",
     description:
-      "เสียงกีตาร์และเพลงโปรดในบรรยากาศอบอุ่น ใกล้ชิดกับศิลปินตลอดค่ำคืน",
+      "เสียงกีตาร์และเพลงโปรดในบรรยากาศอบอุ่น ใกล้ชิดกับศิลปินตลอดค่ำคืน เปิดจองเฉพาะรูปแบบโต๊ะนั่งชิลล์ (ทั้งหมด 20 โต๊ะ)",
+    zoneName: "โซนโต๊ะ Acoustic Lounge",
+    rows: 4,
+    cols: 5,
+    frontRows: 2,
+    frontSeats: 4,
+    frontPriceSatang: 120000,
+    regularSeats: 4,
+    regularPriceSatang: 90000,
   },
   {
     slug: "demo-neon-after-hours",
     title: "Neon After Hours",
-    artist: "Neon Collective",
-    poster: "neon-after-hours",
+    artists: ["Neon Collective", "DJ Pulse"],
+    posterUrl: "/events/neon-after-hours.png",
     daysAway: 22,
-    priceSatang: 89000,
     color: "#C86AE8",
     description:
-      "จังหวะอิเล็กทรอนิกส์ แสงนีออน และดีเจเซ็ตสำหรับคืนที่อยากอยู่ให้นานขึ้น",
+      "จังหวะอิเล็กทรอนิกส์ แสงนีออน และดีเจเซ็ตสำหรับคืนที่อยากอยู่ให้นานขึ้น เปิดจองโต๊ะ VIP หน้าเวที 6 ที่นั่ง และโต๊ะมาตรฐาน 4 ที่นั่ง (ทั้งหมด 24 โต๊ะ)",
+    zoneName: "โซนโต๊ะ Neon Club",
+    rows: 4,
+    cols: 6,
+    frontRows: 1,
+    frontSeats: 6,
+    frontPriceSatang: 280000,
+    regularSeats: 4,
+    regularPriceSatang: 150000,
   },
 ];
+
+export async function upsertTableEvent(
+  venueName: string,
+  config: SampleTableEventConfig,
+) {
+  const now = new Date();
+  const startsAt = new Date(now.getTime() + config.daysAway * 86400000);
+  startsAt.setUTCHours(13, 0, 0, 0);
+  const endsAt = new Date(startsAt.getTime() + 4 * 3600000);
+  const saleStartsAt = new Date(now.getTime() - 86400000);
+  const saleEndsAt = new Date(startsAt.getTime() - 3600000);
+
+  const event = await prisma.event.upsert({
+    where: { slug: config.slug },
+    update: {
+      title: config.title,
+      description: config.description,
+      artists: config.artists,
+      venue: venueName,
+      posterUrl: config.posterUrl,
+      showInSlider: true,
+    },
+    create: {
+      slug: config.slug,
+      title: config.title,
+      description: config.description,
+      artists: config.artists,
+      venue: venueName,
+      posterUrl: config.posterUrl,
+      startsAt,
+      endsAt,
+      saleStartsAt,
+      saleEndsAt,
+      status: "DRAFT",
+      showInSlider: true,
+    },
+  });
+
+  const totalTables = config.rows * config.cols;
+  const totalCapacity =
+    config.frontRows * config.cols * config.frontSeats +
+    (config.rows - config.frontRows) * config.cols * config.regularSeats;
+
+  const tableZone = await prisma.zone.upsert({
+    where: { eventId_code: { eventId: event.id, code: "TABLE" } },
+    update: {
+      name: config.zoneName,
+      sellingMode: "TABLE",
+      capacity: totalCapacity,
+      color: config.color,
+    },
+    create: {
+      eventId: event.id,
+      code: "TABLE",
+      name: config.zoneName,
+      sellingMode: "TABLE",
+      capacity: totalCapacity,
+      color: config.color,
+    },
+  });
+
+  // Deactivate any legacy SEAT units or GA ticket types if no active bookings depend on them
+  await prisma.ticketType.updateMany({
+    where: { eventId: event.id },
+    data: { active: false },
+  });
+  await prisma.bookableUnit.updateMany({
+    where: { eventId: event.id, sellingMode: "SEAT" },
+    data: { active: false },
+  });
+
+  const canvasWidth = 1000;
+  const tileWidth = 114;
+  const tileHeight = 94;
+  const colGap = 24;
+  const rowGap = 18;
+  const gridWidth = config.cols * tileWidth + (config.cols - 1) * colGap;
+  const startX = Math.round((canvasWidth - gridWidth) / 2);
+  const startY = 148;
+  const gridHeight = config.rows * tileHeight + (config.rows - 1) * rowGap;
+  const zoneBoxX = Math.max(36, startX - 28);
+  const zoneBoxY = 118;
+  const zoneBoxWidth = canvasWidth - zoneBoxX * 2;
+  const zoneBoxHeight = gridHeight + 56;
+  const canvasHeight = zoneBoxY + zoneBoxHeight + 92;
+
+  const objects: Record<string, unknown>[] = [
+    {
+      id: "stage-main",
+      type: "stage",
+      shape: "rect",
+      code: "STAGE",
+      name: "STAGE / เวทีการแสดง",
+      x: 280,
+      y: 26,
+      width: 440,
+      height: 66,
+      rotation: 0,
+    },
+    {
+      id: "zone-tables",
+      type: "zone",
+      shape: "rect",
+      code: "ZONE-TABLE",
+      name: `${config.zoneName} (${totalTables} โต๊ะ)`,
+      zoneId: tableZone.id,
+      color: config.color,
+      x: zoneBoxX,
+      y: zoneBoxY,
+      width: zoneBoxWidth,
+      height: zoneBoxHeight,
+      rotation: 0,
+    },
+    {
+      id: "entrance-main",
+      type: "entrance",
+      shape: "rect",
+      code: "ENTRY",
+      name: "ทางเข้า",
+      x: 410,
+      y: zoneBoxY + zoneBoxHeight + 24,
+      width: 180,
+      height: 42,
+      rotation: 0,
+    },
+  ];
+
+  for (let r = 0; r < config.rows; r++) {
+    for (let c = 0; c < config.cols; c++) {
+      const index = r * config.cols + c + 1;
+      const code = `T${String(index).padStart(2, "0")}`;
+      const isFront = r < config.frontRows;
+      const admissionCount = isFront ? config.frontSeats : config.regularSeats;
+      const priceSatang = isFront
+        ? config.frontPriceSatang
+        : config.regularPriceSatang;
+
+      const unit = await prisma.bookableUnit.upsert({
+        where: { eventId_code: { eventId: event.id, code } },
+        update: {
+          zoneId: tableZone.id,
+          name: `โต๊ะ ${code}`,
+          sellingMode: "TABLE",
+          admissionCount,
+          priceSatang,
+          active: true,
+        },
+        create: {
+          eventId: event.id,
+          zoneId: tableZone.id,
+          code,
+          name: `โต๊ะ ${code}`,
+          sellingMode: "TABLE",
+          admissionCount,
+          priceSatang,
+          active: true,
+        },
+      });
+
+      await prisma.unitInventory.upsert({
+        where: { eventId_unitId: { eventId: event.id, unitId: unit.id } },
+        update: {},
+        create: { eventId: event.id, unitId: unit.id, status: "AVAILABLE" },
+      });
+
+      objects.push({
+        id: `unit-${unit.id}`,
+        type: "table",
+        shape: "rect",
+        code,
+        name: unit.name,
+        unitId: unit.id,
+        zoneId: tableZone.id,
+        x: startX + c * (tileWidth + colGap),
+        y: startY + r * (tileHeight + rowGap),
+        width: tileWidth,
+        height: tileHeight,
+        rotation: 0,
+      });
+    }
+  }
+
+  const geometry = { objects } as Prisma.InputJsonValue;
+  const template = await prisma.layoutTemplate.upsert({
+    where: { eventId: event.id },
+    update: {
+      name: `ผังโต๊ะ ${config.title}`,
+      width: canvasWidth,
+      height: canvasHeight,
+      geometry,
+      revision: { increment: 1 },
+    },
+    create: {
+      eventId: event.id,
+      name: `ผังโต๊ะ ${config.title}`,
+      width: canvasWidth,
+      height: canvasHeight,
+      geometry,
+    },
+  });
+
+  const latestVersion = await prisma.layoutVersion.findFirst({
+    where: { eventId: event.id },
+    orderBy: { version: "desc" },
+  });
+  const nextVersionNumber = (latestVersion?.version ?? 0) + 1;
+
+  const layoutVersion = await prisma.layoutVersion.create({
+    data: {
+      eventId: event.id,
+      templateId: template.id,
+      version: nextVersionNumber,
+      width: canvasWidth,
+      height: canvasHeight,
+      geometry,
+    },
+  });
+
+  return prisma.event.update({
+    where: { id: event.id },
+    data: {
+      status: "PUBLISHED",
+      publishedLayoutVersionId: layoutVersion.id,
+      showInSlider: true,
+    },
+  });
+}
 
 async function main() {
   const url = new URL(process.env.DATABASE_URL || "");
@@ -48,136 +316,20 @@ async function main() {
   const business = await prisma.businessProfile.findUniqueOrThrow({
     where: { key: "primary" },
   });
-  for (const sample of samples) {
-    const event = await prisma.$transaction(async (tx) => {
-      const existing = await tx.event.findUnique({
-        where: { slug: sample.slug },
-      });
-      if (existing) return existing;
 
-      const now = new Date();
-      const startsAt = new Date(now.getTime() + sample.daysAway * 86400000);
-      startsAt.setUTCHours(13, 0, 0, 0);
-      const saleStartsAt = new Date(now.getTime() - 86400000);
-      const saleEndsAt = new Date(startsAt.getTime() - 3600000);
-      const created = await tx.event.create({
-        data: {
-          slug: sample.slug,
-          title: sample.title,
-          description: `${sample.description}\n\nอีเวนต์และศิลปินสมมติสำหรับทดลองระบบ OneVentOne ภาพโปสเตอร์สร้างด้วย AI ใช้ข้อมูลการชำระเงินสาธิต`,
-          artists: [sample.artist],
-          venue: business.displayName,
-          posterUrl: `/events/${sample.poster}.png`,
-          startsAt,
-          endsAt: new Date(startsAt.getTime() + 4 * 3600000),
-          saleStartsAt,
-          saleEndsAt,
-        },
-      });
-      const zone = await tx.zone.create({
-        data: {
-          eventId: created.id,
-          code: "GA",
-          name: "หน้าเวที",
-          sellingMode: "GENERAL_ADMISSION",
-          capacity: 80,
-          color: sample.color,
-        },
-      });
-      const pool = await tx.capacityPool.create({
-        data: {
-          eventId: created.id,
-          zoneId: zone.id,
-          code: "GA-SHARED",
-          capacity: 80,
-          available: 80,
-        },
-      });
-      await tx.ticketType.create({
-        data: {
-          eventId: created.id,
-          zoneId: zone.id,
-          poolId: pool.id,
-          code: "GA-REGULAR",
-          name: "บัตรเข้าชม",
-          priceSatang: sample.priceSatang,
-          saleStartsAt,
-          saleEndsAt,
-        },
-      });
-      const geometry: Prisma.InputJsonValue = {
-        objects: [
-          {
-            id: "stage",
-            type: "stage",
-            shape: "rect",
-            code: "STAGE",
-            name: "เวที",
-            x: 250,
-            y: 40,
-            width: 300,
-            height: 90,
-            rotation: 0,
-          },
-          {
-            id: "ga",
-            type: "zone",
-            shape: "rect",
-            code: "GA",
-            name: "หน้าเวที · 80 คน",
-            zoneId: zone.id,
-            color: sample.color,
-            x: 100,
-            y: 190,
-            width: 600,
-            height: 280,
-            rotation: 0,
-          },
-          {
-            id: "entrance",
-            type: "entrance",
-            shape: "rect",
-            code: "ENTRY",
-            name: "ทางเข้า",
-            x: 300,
-            y: 510,
-            width: 200,
-            height: 50,
-            rotation: 0,
-          },
-        ],
-      };
-      const template = await tx.layoutTemplate.create({
-        data: {
-          eventId: created.id,
-          name: sample.title,
-          width: 800,
-          height: 600,
-          geometry,
-        },
-      });
-      const layout = await tx.layoutVersion.create({
-        data: {
-          eventId: created.id,
-          templateId: template.id,
-          version: 1,
-          width: 800,
-          height: 600,
-          geometry,
-        },
-      });
-      return tx.event.update({
-        where: { id: created.id },
-        data: { status: "PUBLISHED", publishedLayoutVersionId: layout.id },
-      });
-    });
-    console.log(`Sample event ready: ${event.title} (${event.slug})`);
+  for (const sample of sampleTableEvents) {
+    const event = await upsertTableEvent(business.displayName, sample);
+    console.log(
+      `Sample table event ready: ${event.title} (${event.slug}) — ${sample.rows * sample.cols} tables`,
+    );
   }
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+if (process.argv[1]?.endsWith("seed-events.ts")) {
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

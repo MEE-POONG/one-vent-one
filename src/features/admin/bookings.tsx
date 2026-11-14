@@ -47,7 +47,7 @@ export function AdminBookings({ payments = false }: { payments?: boolean }) {
               setQ(e.target.value);
               setPage(1);
             }}
-            placeholder="OVO-..."
+            placeholder="MKB-..."
           />
         </Field>
         <Field label="สถานะ">

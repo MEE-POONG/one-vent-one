@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
-import { Camera, CheckCircle2, ScanLine } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Camera, CheckCircle2, KeyRound, ScanLine, Users } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
 import { api, useMutation, useResource } from "@/lib/client-api";
 import type {
@@ -19,13 +19,30 @@ import {
 } from "@/components/ui";
 import { VerifiedTicketFlipCard } from "@/features/tickets/verified-ticket-card";
 
-type CheckInResult = { ticketId: string; status: string; usedAt: string };
+type CheckInResult = {
+  ticketId: string;
+  ticketCode: string;
+  itemLabel: string;
+  status: string;
+  checkedInCount: number;
+  totalAdmissions: number;
+  remainingAdmissions: number;
+  usedAt: string;
+};
 
-function parseScannedToken(raw: string): string | null {
+function parseScannedTokenOrCode(raw: string): string | null {
   const trimmed = raw.trim();
   if (/^[A-Za-z0-9_-]{43}$/.test(trimmed)) return trimmed;
-  const match = trimmed.match(/\/tickets\/verify\/([A-Za-z0-9_-]{43})(?:[/?#]|$)/);
-  return match ? match[1] : null;
+  const urlMatch = trimmed.match(
+    /\/tickets\/verify\/([A-Za-z0-9_-]{43}|[A-Za-z]{2}\d{6})(?:[/?#]|$)/i,
+  );
+  if (urlMatch) {
+    const val = urlMatch[1];
+    return val.length === 8 ? val.toUpperCase() : val;
+  }
+  const compact = trimmed.replace(/[\s-]+/g, "").toUpperCase();
+  if (/^[A-Z]{2}\d{6}$/.test(compact)) return compact;
+  return null;
 }
 
 export function CheckInDesk() {
@@ -34,7 +51,7 @@ export function CheckInDesk() {
     `/api/admin/events?page=${page}&pageSize=50`,
   );
   const mutation = useMutation();
-  const [eventId, setEventId] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState("");
   const [token, setToken] = useState("");
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [inspected, setInspected] = useState<VerifiedTicketInspection | null>(
@@ -48,8 +65,15 @@ export function CheckInDesk() {
   const scanningPaused = useRef(false);
   const busy = useRef(false);
   const disposed = useRef(false);
-  const currentEvent = useRef("");
   const cameraId = `qr-camera-${useId().replace(/:/g, "")}`;
+
+  const defaultEventId = useMemo(() => {
+    const items = events.data?.items ?? [];
+    const pub = items.find((e) => e.status === "PUBLISHED");
+    return pub?.id || items[0]?.id || "";
+  }, [events.data]);
+
+  const eventId = selectedEventId || defaultEventId;
 
   useEffect(() => {
     disposed.current = false;
@@ -76,13 +100,13 @@ export function CheckInDesk() {
     setCameraState("off");
   }
 
-  async function submit(raw: string, selectedEvent = currentEvent.current) {
+  async function submit(raw: string, targetEvent = eventId) {
     if (busy.current) return;
-    const parsedToken = parseScannedToken(raw);
-    if (!selectedEvent || !parsedToken) {
+    const parsedToken = parseScannedTokenOrCode(raw);
+    if (!targetEvent || !parsedToken) {
       setCameraError(
         new Error(
-          "กรุณาเลือกงานและใช้รหัสบัตร 43 ตัวอักษร หรือสแกน QR ของ OneVentOne",
+          "กรุณาเลือกอีเวนท์ และกรอกรหัสบัตร 8 หลัก (เช่น MK001482) หรือสแกน QR Code จากหลังบัตร",
         ),
       );
       return;
@@ -90,11 +114,10 @@ export function CheckInDesk() {
     busy.current = true;
     scanningPaused.current = true;
     setResult(null);
-    setInspected(null);
     setCameraError(null);
     try {
       const checked = await mutation.run<CheckInResult>("/api/check-in", {
-        eventId: selectedEvent,
+        eventId: targetEvent,
         token: parsedToken,
       });
       setResult(checked);
@@ -107,6 +130,9 @@ export function CheckInDesk() {
         setInspected(detail);
       } catch {}
       busy.current = false;
+      window.setTimeout(() => {
+        scanningPaused.current = false;
+      }, 1200);
     }
   }
 
@@ -126,7 +152,7 @@ export function CheckInDesk() {
           if (scanningPaused.current || disposed.current) return;
           scanningPaused.current = true;
           setToken(decoded);
-          void submit(decoded);
+          void submit(decoded, eventId);
         },
         () => {},
       );
@@ -141,7 +167,7 @@ export function CheckInDesk() {
         setCameraState("off");
         setCameraError(
           new Error(
-            "เปิดกล้องไม่ได้ กรุณาอนุญาตการใช้กล้อง หรือกรอกรหัสบัตรด้านล่าง",
+            "เปิดกล้องไม่ได้ กรุณาอนุญาตการใช้กล้อง หรือกรอกรหัสบัตร 8 หลักด้านล่างแทน",
           ),
         );
       }
@@ -157,11 +183,13 @@ export function CheckInDesk() {
     scanningPaused.current = false;
   }
 
+  const parsedInput = parseScannedTokenOrCode(token);
+
   return (
     <>
       <PageHeading
-        title="ตรวจบัตรเข้างาน"
-        description="เลือกอีเวนท์ก่อนสแกน ระบบตรวจบัตรกับข้อมูลล่าสุด และใช้แต่ละบัตรได้ครั้งเดียว"
+        title="ตรวจบัตรเข้างาน (สแกน QR / กรอกรหัสบัตร 8 หลัก)"
+        description="1 โต๊ะใช้บัตรใบเดียวร่วมกันได้ตามจำนวนที่นั่งในโต๊ะ สแกน QR Code หรือกรอกรหัส 8 หลักจากหลังบัตรเพื่อยืนยันเข้างานทีละ 1 ท่านจนครบจำนวนที่นั่งในโต๊ะ"
       />
       <ErrorNotice error={events.error} retry={events.reload} />
       {events.loading ? (
@@ -173,8 +201,7 @@ export function CheckInDesk() {
               value={eventId}
               disabled={mutation.pending || cameraState === "starting"}
               onChange={(e) => {
-                currentEvent.current = e.target.value;
-                setEventId(e.target.value);
+                setSelectedEventId(e.target.value);
                 nextTicket();
                 void stopCamera();
               }}
@@ -193,8 +220,10 @@ export function CheckInDesk() {
           <div className="notice">
             <ScanLine size={20} />
             <p>
-              เมื่อมีผลตรวจ ให้ตรวจข้อความบนหน้าจอก่อนกด “ตรวจบัตรถัดไป”
-              การส่งซ้ำจากปัญหาเครือข่ายจะใช้คำขอเดิม
+              <strong>วิธีตรวจเข้างาน:</strong> เลือกสแกน QR Code จากหลังบัตร
+              หรือกรอก<strong>รหัสบัตร 8 หลัก</strong> (เช่น <code>MK001482</code>{" "}
+              = 2 ตัวอักษร + เลขโต๊ะ 3 หลัก + เลขสุ่ม 3 หลัก)
+              การกดยืนยัน 1 ครั้งจะนับผู้เข้างาน 1 ท่าน จนครบจำนวนที่นั่งในโต๊ะ
             </p>
           </div>
           <div
@@ -210,6 +239,7 @@ export function CheckInDesk() {
           />
           <div className="actions">
             <button
+              type="button"
               className="button button-outline"
               disabled={!eventId || cameraState === "starting"}
               onClick={() => {
@@ -219,48 +249,51 @@ export function CheckInDesk() {
             >
               <Camera size={18} />
               {cameraState === "starting"
-                ? "กำลังเปิดกล้อง"
+                ? "กำลังเปิดกล้อง..."
                 : cameraState === "on"
-                  ? "ปิดกล้อง"
-                  : "เปิดกล้องสแกน"}
+                  ? "ปิดกล้องสแกน"
+                  : "เปิดกล้องสแกน QR Code"}
             </button>
           </div>
           <form
             className="stack-sm"
             onSubmit={(e) => {
               e.preventDefault();
-              void submit(token);
+              void submit(token, eventId);
             }}
           >
             <Field
-              label="รหัสบัตร"
-              hint="กรอกรหัสที่แสดงใต้ QR ได้เมื่อใช้กล้องไม่ได้"
+              label="รหัสบัตร 8 หลัก หรือ QR Code"
+              hint="รูปแบบรหัส 8 หลัก: ตัวอักษร 2 ตัว + เลขโต๊ะ 3 หลัก + เลขสุ่ม 3 หลัก (เช่น MK001482)"
             >
               <input
                 value={token}
-                onChange={(e) => setToken(e.target.value)}
+                onChange={(e) => setToken(e.target.value.toUpperCase())}
                 autoComplete="off"
-                autoCapitalize="none"
+                autoCapitalize="characters"
                 spellCheck={false}
                 required
-                placeholder="รหัสบัตร 43 ตัวอักษร หรือลิงก์จาก QR"
+                placeholder="กรอกรหัสบัตร 8 หลัก เช่น MK001482 หรือสแกน QR Code"
+                style={{
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  fontSize: 16,
+                  letterSpacing: "0.06em",
+                }}
               />
             </Field>
             <div className="actions">
               <button
+                type="submit"
                 className="button"
-                disabled={
-                  !eventId ||
-                  !parseScannedToken(token) ||
-                  mutation.pending ||
-                  Boolean(result)
-                }
+                disabled={!eventId || !parsedInput || mutation.pending}
               >
+                <KeyRound size={16} />
                 {mutation.pending
-                  ? "กำลังตรวจบัตร"
-                  : mutation.error
-                    ? "ลองตรวจรหัสเดิมอีกครั้ง"
-                    : "ตรวจบัตร"}
+                  ? "กำลังยืนยันเข้างาน..."
+                  : result && result.remainingAdmissions > 0
+                    ? `ยืนยันเข้างานซ้ำรหัสเดิม (+1 ท่าน · ครั้งที่ ${result.checkedInCount + 1}/${result.totalAdmissions})`
+                    : "ยืนยันให้เข้างาน (+1 ท่าน)"}
               </button>
               <button
                 type="button"
@@ -268,18 +301,51 @@ export function CheckInDesk() {
                 disabled={mutation.pending}
                 onClick={nextTicket}
               >
-                ตรวจบัตรถัดไป
+                ล้างข้อมูล / ตรวจโต๊ะถัดไป
               </button>
             </div>
           </form>
           <ErrorNotice error={cameraError} />
           <ErrorNotice error={mutation.error} />
           {result ? (
-            <div role="status" className="notice">
-              <CheckCircle2 size={24} />
-              <div>
-                <strong>ตรวจบัตรสำเร็จ · อนุญาตให้เข้างาน 1 คน</strong>
-                <p>บันทึกเวลา {dateTime(result.usedAt)}</p>
+            <div role="status" className="checkin-result">
+              <div className="between" style={{ flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <CheckCircle2 size={22} />
+                    <span>
+                      ยืนยันเข้างานสำเร็จ · {result.itemLabel} (รหัส {result.ticketCode})
+                    </span>
+                  </h3>
+                  <p style={{ marginTop: 4 }}>
+                    <Users
+                      size={15}
+                      style={{ display: "inline", marginRight: 6 }}
+                    />
+                    เช็กอินเข้างานแล้ว{" "}
+                    <strong>
+                      {result.checkedInCount} / {result.totalAdmissions} ที่นั่ง
+                    </strong>{" "}
+                    {result.remainingAdmissions > 0
+                      ? `(ยังเข้างานได้อีก ${result.remainingAdmissions} ท่าน)`
+                      : "(ครบทุกที่นั่งในโต๊ะแล้ว)"}{" "}
+                    · เวลา {dateTime(result.usedAt)}
+                  </p>
+                </div>
+                {result.remainingAdmissions > 0 ? (
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={mutation.pending}
+                    onClick={() => void submit(result.ticketCode, eventId)}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>
+                      ยืนยันเพิ่มอีก 1 ท่าน ({result.checkedInCount + 1}/
+                      {result.totalAdmissions})
+                    </span>
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -287,7 +353,14 @@ export function CheckInDesk() {
             <div style={{ marginTop: 18 }}>
               <VerifiedTicketFlipCard
                 data={inspected}
-                showStaffAction={false}
+                defaultFlipped={true}
+                onCheckInSuccess={() => {
+                  if (parsedInput) {
+                    void api<VerifiedTicketInspection>(
+                      `/api/tickets/verify/${encodeURIComponent(parsedInput)}`,
+                    ).then(setInspected);
+                  }
+                }}
               />
             </div>
           ) : null}

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const [businessResult, eventsResult] = await Promise.allSettled([
     getBusinessProfile(),
-    listEvents({ pageSize: 6 }),
+    listEvents({ pageSize: 18 }),
   ]);
   const business =
     businessResult.status === "fulfilled" ? businessResult.value : null;

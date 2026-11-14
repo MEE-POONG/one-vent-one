@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
+import { attachShowInSlider } from "./event-admin";
 
 export async function getBusinessProfile() {
   const profile = await prisma.businessProfile.findUnique({
@@ -32,7 +33,7 @@ export async function listEvents({
         }
       : {}),
   };
-  const [events, total] = await Promise.all([
+  const [rawEvents, total] = await Promise.all([
     prisma.event.findMany({
       where,
       orderBy: { startsAt: "asc" },
@@ -46,6 +47,7 @@ export async function listEvents({
     }),
     prisma.event.count({ where }),
   ]);
+  const events = await attachShowInSlider(rawEvents);
   return {
     items: events.map(({ units, ticketTypes, ...event }) => ({
       ...event,

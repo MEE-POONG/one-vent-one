@@ -36,6 +36,7 @@ export const eventFields = z.object({
   endsAt: date,
   saleStartsAt: date,
   saleEndsAt: date,
+  showInSlider: z.boolean().optional(),
 });
 export const createEventInput = eventFields.refine(
   (v) =>
@@ -65,10 +66,10 @@ export const zoneInput = z.object({
 });
 export const unitInput = z
   .object({
-    zoneId: objectId,
+    zoneId: objectId.optional(),
     code,
     name: z.string().trim().min(1).max(100),
-    sellingMode: z.enum(["TABLE", "SEAT"]),
+    sellingMode: z.enum(["TABLE", "SEAT"]).default("TABLE"),
     admissionCount: z.number().int().min(1).max(20),
     priceSatang: price,
     parentUnitId: objectId.nullable().optional(),
@@ -77,6 +78,39 @@ export const unitInput = z
     message: "ที่นั่งหนึ่งหน่วยมีหนึ่งสิทธิ์เข้า",
     path: ["admissionCount"],
   });
+export const batchUnitInput = z.object({
+  zoneId: objectId.optional(),
+  newZone: z
+    .object({
+      code,
+      name: z.string().trim().min(1).max(100),
+      color: z
+        .string()
+        .regex(/^#[0-9a-f]{6}$/i)
+        .default("#E11D48"),
+    })
+    .optional(),
+  sellingMode: z.enum(["TABLE", "SEAT"]).default("TABLE"),
+  units: z
+    .array(
+      z.object({
+        code,
+        name: z.string().trim().min(1).max(100),
+        admissionCount: z.number().int().min(1).max(20),
+        priceSatang: price,
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+export const batchPriceEditInput = z.object({
+  zoneId: objectId.optional(),
+  unitIds: z.array(objectId).min(1).max(500).optional(),
+  priceSatang: price.optional(),
+  admissionCount: z.number().int().min(1).max(20).optional(),
+  reason: z.string().trim().min(3).max(1000),
+  eventVersion: z.number().int().min(0),
+});
 export const ticketTypeInput = z
   .object({
     zoneId: objectId,

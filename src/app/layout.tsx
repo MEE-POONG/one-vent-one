@@ -108,6 +108,7 @@ export default async function RootLayout({
                 <div className="footer-links">
                   <Link href="/login">เข้าสู่ระบบ</Link>
                   <Link href="/register">สมัครสมาชิก</Link>
+                  <Link href="/forgot-password">กู้คืนรหัสผ่าน</Link>
                 </div>
               </div>
             </div>

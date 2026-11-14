@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { api, ApiError, useResource } from "@/lib/client-api";
@@ -13,7 +13,6 @@ import {
   Loading,
   money,
   PageHeading,
-  modeText,
 } from "@/components/ui";
 import { VenueView } from "@/components/venue-view";
 
@@ -29,24 +28,14 @@ export function BookingPicker({ slug }: { slug: string }) {
     event ? `/api/events/${event.id}/availability` : null,
     7000,
   );
-  const [zoneId, setZoneId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [accepted, setAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const intent = useRef<{ payload: string; key: string } | null>(null);
   const data = availability.data;
-  const tableZones = useMemo(() => {
-    const filtered = (event?.zones || []).filter(
-      (z) => z.sellingMode === "TABLE",
-    );
-    return filtered.length ? filtered : event?.zones || [];
-  }, [event?.zones]);
-  const activeZone = zoneId || tableZones[0]?.id;
   const units =
-    data?.units.filter(
-      (u) => u.zoneId === activeZone && u.sellingMode === "TABLE",
-    ) || [];
+    data?.units.filter((u) => u.sellingMode === "TABLE") || [];
   const selectedUnits =
     data?.units.filter((u) => selected.includes(u.id)) || [];
   const estimatedTotal = selectedUnits.reduce(
@@ -195,20 +184,6 @@ export function BookingPicker({ slug }: { slug: string }) {
                   </span>
                 ) : null}
               </div>
-              {tableZones.length > 1 ? (
-                <div className="tabs" role="tablist" aria-label="โซนโต๊ะ">
-                  {tableZones.map((zone) => (
-                    <button
-                      key={zone.id}
-                      role="tab"
-                      aria-selected={activeZone === zone.id}
-                      onClick={() => setZoneId(zone.id)}
-                    >
-                      {zone.name} · {modeText(zone.sellingMode)}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <ErrorNotice
                 error={availability.error}
                 retry={availability.reload}
@@ -218,13 +193,13 @@ export function BookingPicker({ slug }: { slug: string }) {
               ) : data?.layout ? (
                 <VenueView
                   layout={data.layout}
-                  units={data.units.filter((u) => u.sellingMode === "TABLE")}
+                  units={units}
                   selected={selected}
                   onSelect={toggle}
                   tablesOnly
                 />
               ) : (
-                <Empty title="โซนนี้ยังไม่มีผังโต๊ะเปิดขาย" />
+                <Empty title="ยังไม่มีผังโต๊ะเปิดขาย" />
               )}
             </div>
           </div>

@@ -105,6 +105,13 @@ export function AuthForm({
               autoComplete={signup ? "new-password" : "current-password"}
             />
           </Field>
+          {!signup ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -8 }}>
+              <Link className="text-link" href="/forgot-password" style={{ fontSize: 13 }}>
+                ลืมรหัสผ่าน? กู้คืนด้วยอีเมล
+              </Link>
+            </div>
+          ) : null}
           <ErrorNotice error={error} />
           <button
             className="mongkol-button button-wide"
@@ -126,8 +133,10 @@ export function AuthForm({
           </Link>
         </p>
         <p className="auth-note">
-          หากไม่สามารถเข้าสู่ระบบได้ กรุณาติดต่อผู้ดูแลร้าน
-          ขณะนี้ยังไม่เปิดบริการรีเซ็ตรหัสผ่านทางอีเมล
+          ลืมรหัสผ่านใช่ไหม?{" "}
+          <Link className="text-link" href="/forgot-password">
+            กู้คืนรหัสผ่านผ่านอีเมลได้ที่นี่
+          </Link>
         </p>
       </div>
     </div>

@@ -294,7 +294,7 @@ function Tickets({ bookingId }: { bookingId: string }) {
   return (
     <section>
       <div className="section-head">
-        <h2>บัตรเข้างานของคุณ</h2>
+        <h2>บัตรประจำโต๊ะของคุณ</h2>
         <TicketIcon size={24} />
       </div>
       <div className="ticket-save-advisory">
@@ -302,10 +302,11 @@ function Tickets({ bookingId }: { bookingId: string }) {
           <Smartphone size={22} />
         </div>
         <div>
-          <strong>เปิดบัตรเข้างานจากบัญชีของคุณ</strong>
+          <strong>1 โต๊ะ = 1 บัตรเข้างาน (แคปหน้าจอส่งให้เพื่อนร่วมโต๊ะได้)</strong>
           <p>
-            กด “ดูบัตรเข้างาน” เพื่อเปิดบัตรแต่ละใบและแสดงให้เจ้าหน้าที่ตรวจสอบ
-            คุณสามารถกลับมาเปิดบัตรได้ที่เมนูการจองของฉัน
+            ไม่ว่าโต๊ะจะมีกี่ที่นั่ง ระบบจะออกบัตรประจำโต๊ะเพียงใบเดียว
+            หากมาด้วยกันหลายท่าน ให้กด “เปิดดูบัตรเข้างาน” แล้วพลิกด้านหลังบัตรเพื่อแคปหน้าจอ
+            (ที่มี QR Code และรหัสบัตร 8 หลัก) ส่งให้เพื่อนในโต๊ะใช้แสดงต่อเจ้าหน้าที่ตอนเข้างานได้เลย
           </p>
         </div>
       </div>
@@ -315,19 +316,56 @@ function Tickets({ bookingId }: { bookingId: string }) {
       ) : resource.data?.tickets.length ? (
         <div className="ticket-grid">
           {resource.data.tickets.map((ticket) => {
+            const totalSeats = ticket.totalAdmissions || 1;
+            const checkedIn = ticket.checkedInCount ?? 0;
+            const remaining =
+              ticket.remainingAdmissions ?? Math.max(0, totalSeats - checkedIn);
             return (
               <article className="ticket-card" key={ticket.id}>
                 <div className="between" style={{ gap: 10 }}>
-                  <h3>{ticket.itemLabel || "บัตรเข้างาน"}</h3>
+                  <h3>{ticket.itemLabel || "บัตรประจำโต๊ะ"}</h3>
                   <Status value={ticket.status} />
                 </div>
-                <small className="muted">
-                  ลำดับสิทธิ์ใบที่ {ticket.admissionSequence}
-                </small>
+                <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  บัตรประจำโต๊ะสำหรับ <strong>{totalSeats} ที่นั่ง</strong> ·
+                  เช็กอินแล้ว{" "}
+                  <strong>
+                    {checkedIn} / {totalSeats} ท่าน
+                  </strong>{" "}
+                  (คงเหลือ {remaining} ที่นั่ง)
+                </p>
+                {ticket.ticketCode ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: "10px 14px",
+                      borderRadius: 12,
+                      background: "#09090eb3",
+                      border: "1px solid #ffffff1f",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <small className="muted">รหัสบัตร 8 หลัก (กรอกหน้างาน)</small>
+                    <strong
+                      style={{
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        fontSize: 16,
+                        letterSpacing: "0.08em",
+                        color: "#fbbf24",
+                      }}
+                    >
+                      {ticket.ticketCode}
+                    </strong>
+                  </div>
+                ) : null}
                 {ticket.status !== "ACTIVE" ? (
-                  <p style={{ marginTop: 20 }}>
+                  <p style={{ marginTop: 14, fontSize: 13 }} className="muted">
                     {ticket.usedAt
-                      ? `ใช้เข้างานเมื่อ ${dateTime(ticket.usedAt)}`
+                      ? `เช็กอินครบทุกที่นั่งเมื่อ ${dateTime(ticket.usedAt)}`
                       : "บัตรนี้ไม่พร้อมใช้งาน"}
                   </p>
                 ) : null}
@@ -335,10 +373,10 @@ function Tickets({ bookingId }: { bookingId: string }) {
                   <Link
                     href={`/tickets/verify/${encodeURIComponent(ticket.token)}`}
                     className="mongkol-button ticket-verify-link"
-                    style={{ marginTop: 12 }}
+                    style={{ marginTop: 14 }}
                   >
                     <TicketIcon size={16} />
-                    <span>ดูบัตรเข้างาน</span>
+                    <span>เปิดดูบัตรเข้างาน (QR & รหัส 8 หลัก)</span>
                     <ExternalLink size={14} />
                   </Link>
                 ) : null}

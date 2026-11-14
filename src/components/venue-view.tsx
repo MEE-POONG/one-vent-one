@@ -152,7 +152,11 @@ export function VenueView({
           >
             {[...layout.geometry.objects]
               .filter((object) =>
-                tablesOnly ? object.type.toUpperCase() === "TABLE" : true,
+                tablesOnly
+                  ? ["TABLE", "STAGE", "ENTRANCE", "SERVICE", "LABEL"].includes(
+                      object.type.toUpperCase(),
+                    )
+                  : true,
               )
               .sort(
                 (a, b) =>

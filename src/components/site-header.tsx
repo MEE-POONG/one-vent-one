@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowRight, CalendarDays, LogOut, MapPin, Menu, Search, UserRound, X } from "lucide-react";
+import { ArrowRight, CalendarDays, KeyRound, LogOut, MapPin, Menu, Search, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { isStaff, rolesOf } from "@/lib/roles";
@@ -15,7 +15,7 @@ const menuItems = [
   ["หน้าแรก", "/", "home"],
   ["อีเวนต์", "/#events", "events"],
   ["ติดต่อเรา", "/#contact", "contact"],
-  ["ตรวจสอบการจอง", "/account/bookings", ""],
+  ["การจองของฉัน", "/account/bookings", ""],
 ] as const;
 
 export function SiteHeader({
@@ -131,7 +131,21 @@ export function SiteHeader({
         >
           {searchOpen ? <X size={19} /> : <Search size={19} />}
         </button>
-        {session ? <button className="button button-outline header-auth" onClick={async () => { await authClient.signOut(); window.location.assign(new URL("/", window.location.origin).href); }}><LogOut size={17} /><span>ออกจากระบบ</span></button> : <Link href="/login" className="button button-outline header-auth"><UserRound size={17} /><span>เข้าสู่ระบบ</span></Link>}
+        {!session ? (
+          <Link href="/login" className="button button-outline header-auth">
+            <UserRound size={17} />
+            <span>เข้าสู่ระบบ</span>
+          </Link>
+        ) : (
+          <Link
+            href="/account"
+            className="button button-outline header-auth header-user-pill"
+            title={`โปรไฟล์ของ ${session.user.name}`}
+          >
+            <UserRound size={17} />
+            <span>{session.user.name}</span>
+          </Link>
+        )}
         <button className="header-menu" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู" aria-expanded={menuOpen} aria-controls="site-menu"><Menu size={21} /></button>
       </div>
     </div>
@@ -240,7 +254,39 @@ export function SiteHeader({
           </div>
         ) : null}
       </div>
-      <Link className="menu-login" href={session ? "/account" : "/login"} onClick={() => setMenuOpen(false)}><UserRound size={17} />{session ? "โปรไฟล์ของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</Link>
+      <div className="menu-bottom-actions">
+        <Link
+          className="menu-login"
+          href={session ? "/account" : "/login"}
+          onClick={() => setMenuOpen(false)}
+        >
+          <UserRound size={17} />
+          <span>{session ? "โปรไฟล์ของฉัน" : "เข้าสู่ระบบ / สมัครสมาชิก"}</span>
+        </Link>
+        {session ? (
+          <button
+            type="button"
+            className="menu-login"
+            onClick={async () => {
+              setMenuOpen(false);
+              await authClient.signOut();
+              window.location.assign(new URL("/", window.location.origin).href);
+            }}
+          >
+            <LogOut size={17} />
+            <span>ออกจากระบบ</span>
+          </button>
+        ) : (
+          <Link
+            className="menu-login menu-login-subtle"
+            href="/forgot-password"
+            onClick={() => setMenuOpen(false)}
+          >
+            <KeyRound size={17} />
+            <span>กู้คืนรหัสผ่าน</span>
+          </Link>
+        )}
+      </div>
     </aside>
     {menuOpen ? <button className="menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" /> : null}
   </header>;

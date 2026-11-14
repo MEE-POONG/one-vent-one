@@ -46,8 +46,8 @@ export function Reports({ dashboard = false }: { dashboard?: boolean }) {
         title={dashboard ? "ภาพรวมวันนี้" : "รายงานการจองและการเงิน"}
         description={
           dashboard
-            ? "ติดตามอีเวนท์ คิวตรวจชำระ และสิทธิ์เข้างาน"
-            : "ยอดจากการจองและเงินที่เจ้าหน้าที่ตรวจแล้ว แยกจากยอดในหลักฐาน"
+            ? "ติดตามอีเวนท์ ยอดการจอง และจำนวนผู้เข้างาน"
+            : "ยอดจากการจองและรายได้สุทธิของแต่ละอีเวนท์"
         }
         action={
           <button className="button button-outline" onClick={resource.reload}>
@@ -83,15 +83,15 @@ export function Reports({ dashboard = false }: { dashboard?: boolean }) {
               <strong>{data.publishedEvents}</strong>
             </div>
             <div className="metric">
-              <p>รายการรอตรวจ / ขอแก้ไข</p>
-              <strong>{data.reviewQueue}</strong>
+              <p>รายการจองที่ยืนยันแล้ว</p>
+              <strong>{data.statusTotals.CONFIRMED?.count ?? 0}</strong>
             </div>
             <div className="metric">
               <p>ยอดการจองยืนยัน</p>
               <strong>{money(data.confirmedSatang)}</strong>
             </div>
             <div className="metric">
-              <p>เข้างานแล้ว / สิทธิ์ที่ออก</p>
+              <p>เข้างานแล้ว / ที่นั่งที่จอง</p>
               <strong>
                 {data.checkedIn}{" "}
                 <span className="muted" style={{ fontSize: 18 }}>
@@ -100,19 +100,11 @@ export function Reports({ dashboard = false }: { dashboard?: boolean }) {
               </strong>
             </div>
           </div>
-          {data.overdueReview > 0 ? (
-            <div className="notice" style={{ marginBottom: 25 }}>
-              <p>
-                มี {data.overdueReview} รายการเกินกำหนดตรวจหรือแก้ไข
-                สิทธิ์ยังคงถูกกันไว้จนกว่าเจ้าหน้าที่จะดำเนินการ
-              </p>
-            </div>
-          ) : null}
           <div className="section-head">
             <h2>สถานะการจอง</h2>
             {dashboard ? (
-              <Link href="/admin/payments">
-                เปิดคิวตรวจ <ArrowRight size={16} />
+              <Link href="/admin/bookings">
+                ดูรายการจองทั้งหมด <ArrowRight size={16} />
               </Link>
             ) : null}
           </div>

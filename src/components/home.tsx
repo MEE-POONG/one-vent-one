@@ -3,12 +3,38 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Ticket } from "lucide-react";
-import { EventCard } from "@/components/ui";
+import {
+  ArrowRight,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Mic2,
+  Ticket,
+} from "lucide-react";
+import { dateTime, EventCard } from "@/components/ui";
 import type { EventData } from "@/lib/client-types";
 
 type Props = { events: EventData[]; venueName: string };
-const examples = ["ROOFTOP RHYTHM", "SIP & SOUL", "MIDNIGHT GROOVE", "RED ROOM NIGHTS", "LIVE SESSION", "LAST CALL"];
+const examples = [
+  "ROOFTOP RHYTHM",
+  "SIP & SOUL",
+  "MIDNIGHT GROOVE",
+  "RED ROOM NIGHTS",
+  "LIVE SESSION",
+  "LAST CALL",
+];
+
+type HeroSlideItem = {
+  id: string;
+  title: string;
+  artistsLine: string;
+  venue: string;
+  startsAt: string;
+  description: string;
+  posterUrl: string;
+  bookingHref: string;
+};
 
 function Tilt({ children }: { children: React.ReactNode }) {
   function move(event: MouseEvent<HTMLDivElement>) {
@@ -22,23 +48,75 @@ function Tilt({ children }: { children: React.ReactNode }) {
     event.currentTarget.style.setProperty("--tilt-x", "0deg");
     event.currentTarget.style.setProperty("--tilt-y", "0deg");
   }
-  return <div className="mongkol-event" onMouseMove={move} onMouseLeave={reset}>{children}</div>;
+  return (
+    <div className="mongkol-event" onMouseMove={move} onMouseLeave={reset}>
+      {children}
+    </div>
+  );
 }
 
 export function Home({ events, venueName }: Props) {
   const [slide, setSlide] = useState(0);
   const shown = useMemo(() => events.slice(0, 6), [events]);
 
+  const slides = useMemo<HeroSlideItem[]>(() => {
+    const published = events.filter((e) => e.status === "PUBLISHED");
+    const featured = published.filter((e) => e.showInSlider);
+    const source = featured.length > 0 ? featured : published;
+
+    if (source.length > 0) {
+      return source.map((ev) => {
+        const cleanDesc = (ev.description || "")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)[0] || `จองโต๊ะล่วงหน้าได้ทันทีที่ ${ev.venue || venueName}`;
+        return {
+          id: ev.id,
+          title: ev.title,
+          artistsLine: ev.artists?.length
+            ? ev.artists.join(" · ")
+            : `Live Session @ ${ev.venue || venueName}`,
+          venue: ev.venue || venueName,
+          startsAt: ev.startsAt,
+          description: cleanDesc,
+          posterUrl: ev.posterUrl || "/concert-hero.png",
+          bookingHref: ev.slug ? `/events/${ev.slug}/booking` : "#events",
+        };
+      });
+    }
+
+    return [
+      {
+        id: "default-slide",
+        title: "OneVentOne",
+        artistsLine: "คืนที่ใช่ เริ่มต้นที่นี่",
+        venue: venueName,
+        startsAt: "",
+        description: `จองโต๊ะเข้างานล่วงหน้าได้ทันที ที่ ${venueName}`,
+        posterUrl: "/concert-hero.png",
+        bookingHref: "#events",
+      },
+    ];
+  }, [events, venueName]);
+
+  const activeIndex = slides.length > 0 ? slide % slides.length : 0;
+  const currentSlide = slides[activeIndex] ?? slides[0];
+
   useEffect(() => {
-    const id = window.setInterval(() => setSlide((v) => (v + 1) % 3), 6000);
+    if (slides.length <= 1) return;
+    const id = window.setInterval(
+      () => setSlide((v) => (v + 1) % slides.length),
+      6000,
+    );
     return () => window.clearInterval(id);
-  }, []);
+  }, [slides.length]);
 
   useEffect(() => {
     function scrollToTargetSection() {
       let target = "";
       try {
-        target = window.sessionStorage.getItem("oneventone_scroll_target") || "";
+        target =
+          window.sessionStorage.getItem("oneventone_scroll_target") || "";
         if (target) {
           window.sessionStorage.removeItem("oneventone_scroll_target");
         }
@@ -74,12 +152,6 @@ export function Home({ events, venueName }: Props) {
     };
   }, []);
 
-  const hero = [
-    ["OneVentOne", "NIGHTLIFE · LIVE EVENT · VIP TABLE", "คืนที่ใช่ เริ่มต้นที่นี่", "จองบัตรเข้างานและเลือกโต๊ะ VIP ล่วงหน้าได้ทันที"],
-    ["RED ROOM NIGHTS", "LIVE MUSIC · DJ LINEUP · EXCLUSIVE", "ปล่อยใจไปกับจังหวะ", "พบกับศิลปินและดีเจชั้นนำทุกสุดสัปดาห์"],
-    ["LIVE SESSION", "THE WEEKEND STARTS HERE", "ยกแก้วให้ค่ำคืนนี้", "บรรยากาศระดับคลับพรีเมียม ดนตรีสด และโซนที่นั่งที่ดีที่สุด"],
-  ][slide];
-
   const display: EventData[] = shown.length
     ? shown
     : examples.map((title, index) => ({
@@ -101,44 +173,99 @@ export function Home({ events, venueName }: Props) {
 
   return (
     <div className="mongkol-page">
-      <section className={`mongkol-hero hero-slide-${slide}`} id="home">
-        <Image src="/concert-hero.png" alt={`บรรยากาศคอนเสิร์ต ${venueName}`} fill priority sizes="100vw" />
+      <section
+        className={`mongkol-hero hero-slide-${activeIndex % 3}`}
+        id="home"
+      >
+        {slides.map((item, idx) => {
+          const isActive = idx === activeIndex;
+          return (
+            <Image
+              key={item.id}
+              src={item.posterUrl}
+              alt={isActive ? `บรรยากาศอีเวนต์ ${item.title}` : ""}
+              fill
+              priority={idx === 0}
+              sizes="100vw"
+              unoptimized={item.posterUrl.startsWith("https:")}
+              aria-hidden={!isActive}
+              className={`hero-slide-poster hero-poster-variant-${idx % 3}${isActive ? " is-active" : ""}`}
+            />
+          );
+        })}
         <div className="hero-noise" />
         <div className="hero-orb orb-one" />
         <div className="hero-orb orb-two" />
         <div className="hero-orb orb-three" />
         <div className="mongkol-container hero-content">
-          <p className="eyebrow">{hero[1]}</p>
-          <h1 className="dnxt-glitch-text_heading" data-text={hero[0]}>
-            {hero[0]}
-          </h1>
-          <p className="hero-title">{hero[2]}</p>
-          <p className="hero-copy">{hero[3]} ที่ {venueName}</p>
-          <div className="hero-actions">
-            <a href="#events" className="mongkol-button">
-              <Ticket size={18} /> จองบัตรเลย
-            </a>
-            <Link href="/events" className="view-all-button hero-more">
-              ดูตารางอีเวนต์ <ArrowRight size={17} />
-            </Link>
+          <div key={currentSlide.id} className="hero-text-stack">
+            <h1
+              className="dnxt-glitch-text_heading"
+              data-text={currentSlide.title}
+            >
+              {currentSlide.title}
+            </h1>
+            <p className="hero-title">
+              <Mic2 size={18} className="hero-inline-icon" />{" "}
+              {currentSlide.artistsLine}
+            </p>
+            {currentSlide.startsAt ? (
+              <div className="hero-event-meta">
+                <span>
+                  <CalendarDays size={15} />
+                  {dateTime(currentSlide.startsAt)}
+                </span>
+                <span>
+                  <MapPin size={15} />
+                  {currentSlide.venue}
+                </span>
+              </div>
+            ) : null}
+            <p className="hero-copy">{currentSlide.description}</p>
           </div>
-          <div className="hero-pager">
-            {[0, 1, 2].map((item) => (
-              <button
-                key={item}
-                onClick={() => setSlide(item)}
-                aria-label={`สไลด์ ${item + 1}`}
-                className={item === slide ? "active" : ""}
-              />
-            ))}
+          <div className="hero-bottom-anchor">
+            <div className="hero-actions">
+              <Link href={currentSlide.bookingHref} className="mongkol-button">
+                <Ticket size={18} /> จองโต๊ะเลย
+              </Link>
+              <Link href="/events" className="view-all-button hero-more">
+                ดูตารางอีเวนต์ <ArrowRight size={17} />
+              </Link>
+            </div>
+            {slides.length > 1 ? (
+              <div className="hero-pager">
+                {slides.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSlide(idx)}
+                    aria-label={`สไลด์ ${idx + 1}: ${item.title}`}
+                    className={idx === activeIndex ? "active" : ""}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
-        <button className="hero-arrow hero-prev" onClick={() => setSlide((slide + 2) % 3)} aria-label="สไลด์ก่อนหน้า">
-          <ChevronLeft />
-        </button>
-        <button className="hero-arrow hero-next" onClick={() => setSlide((slide + 1) % 3)} aria-label="สไลด์ถัดไป">
-          <ChevronRight />
-        </button>
+        {slides.length > 1 ? (
+          <>
+            <button
+              className="hero-arrow hero-prev"
+              onClick={() =>
+                setSlide((activeIndex + slides.length - 1) % slides.length)
+              }
+              aria-label="สไลด์ก่อนหน้า"
+            >
+              <ChevronLeft />
+            </button>
+            <button
+              className="hero-arrow hero-next"
+              onClick={() => setSlide((activeIndex + 1) % slides.length)}
+              aria-label="สไลด์ถัดไป"
+            >
+              <ChevronRight />
+            </button>
+          </>
+        ) : null}
       </section>
 
       <section className="mongkol-section events-section" id="events">

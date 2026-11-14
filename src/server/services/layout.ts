@@ -70,20 +70,19 @@ export async function validateGeometry(
       );
     if (["table", "seat"].includes(obj.type)) {
       invariant(
-        obj.zoneId && obj.unitId,
+        obj.unitId,
         "VALIDATION_ERROR",
-        `กรุณาผูก ${obj.code} กับโซนและหน่วยขายจริง`,
+        `กรุณาผูก ${obj.code} กับหน่วยขายโต๊ะจริง`,
         422,
       );
       const unit = unitMap.get(obj.unitId);
       invariant(
-        unit &&
-          unit.zoneId === obj.zoneId &&
-          unit.sellingMode === obj.type.toUpperCase(),
+        unit && unit.sellingMode === obj.type.toUpperCase(),
         "VALIDATION_ERROR",
-        `หน่วยขาย ${obj.code} ไม่ตรงกับโซนหรือประเภท`,
+        `หน่วยขาย ${obj.code} ไม่ตรงกับประเภท`,
         422,
       );
+      obj.zoneId = unit.zoneId;
       invariant(
         !linkedUnits.has(unit.id),
         "VALIDATION_ERROR",

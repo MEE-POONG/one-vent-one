@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   ClipboardList,
-  CreditCard,
   LayoutDashboard,
   ScanLine,
   Settings2,
@@ -36,12 +35,6 @@ const nav = [
     href: "/admin/bookings",
     label: "รายการจอง",
     icon: ClipboardList,
-    roles: STAFF,
-  },
-  {
-    href: "/admin/payments",
-    label: "ตรวจชำระเงิน",
-    icon: CreditCard,
     roles: STAFF,
   },
   {

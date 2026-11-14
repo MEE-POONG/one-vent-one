@@ -174,6 +174,7 @@ model Event {
   saleStartsAt             DateTime
   saleEndsAt               DateTime
   status                   EventStatus            @default(DRAFT)
+  showInSlider             Boolean                @default(false)
   publishedLayoutVersionId String?                @db.ObjectId
   publishedLayoutVersion   LayoutVersion?         @relation("PublishedLayout", fields: [publishedLayoutVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   version                  Int                    @default(0)

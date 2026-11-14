@@ -21,7 +21,7 @@ export function LayoutEditor({ eventId }: { eventId: string }) {
       />
       <div className="tabs-links">
         <Link href={`/admin/events/${eventId}`}>รายละเอียดงาน</Link>
-        <Link href={`/admin/events/${eventId}/inventory`}>โซนและหน่วยขาย</Link>
+        <Link href={`/admin/events/${eventId}/inventory`}>จัดการโต๊ะและราคา</Link>
         <Link href={`/admin/events/${eventId}/layout`}>แก้ไขผัง</Link>
       </div>
       <ErrorNotice

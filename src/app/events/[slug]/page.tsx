@@ -120,47 +120,72 @@ export default async function EventPage({
 
             <div className="panel customer-sticky-card">
               <div className="section-kicker">
-                <span /> SELECT ZONE
+                <span /> TABLE PRICING
               </div>
               <h2 style={{ marginTop: 10, marginBottom: 18 }}>
-                เลือกโซนโต๊ะของคุณ
+                ราคาชุดโต๊ะในงาน
               </h2>
 
               <div className="zone-tier-list">
                 {(() => {
-                  const allZones = event.zones ?? [];
-                  const tableZones = allZones.filter(
-                    (zone) => zone.sellingMode === "TABLE",
+                  const allUnits = (event.zones ?? []).flatMap(
+                    (zone) => zone.units || [],
                   );
-                  const displayZones = tableZones.length ? tableZones : allZones;
-                  return displayZones.map((zone) => {
-                    const seatCounts = Array.from(
-                      new Set((zone.units || []).map((u) => u.admissionCount)),
-                    ).sort((a, b) => a - b);
+                  const tierMap = new Map<
+                    string,
+                    {
+                      seats: number;
+                      priceSatang: number;
+                      codes: string[];
+                    }
+                  >();
+                  for (const u of allUnits) {
+                    const key = `${u.admissionCount}-${u.priceSatang}`;
+                    const cur = tierMap.get(key) ?? {
+                      seats: u.admissionCount,
+                      priceSatang: u.priceSatang,
+                      codes: [],
+                    };
+                    cur.codes.push(u.code);
+                    tierMap.set(key, cur);
+                  }
+                  const tiers = Array.from(tierMap.values()).sort(
+                    (a, b) => a.priceSatang - b.priceSatang || a.seats - b.seats,
+                  );
+
+                  if (tiers.length === 0) {
                     return (
-                      <div key={zone.id} className="zone-tier-card">
+                      <div className="zone-tier-card">
                         <div>
-                          <strong>{zone.name}</strong>
-                          <small>จองเป็นรายโต๊ะ (Table Only)</small>
-                          {seatCounts.length ? (
-                            <small>
-                              1 โต๊ะ · เข้าได้{" "}
-                              {seatCounts.length === 1
-                                ? `${seatCounts[0]} ที่นั่ง`
-                                : `${seatCounts[0]}–${seatCounts[seatCounts.length - 1]} ที่นั่ง`}
-                            </small>
-                          ) : null}
+                          <strong>จองเป็นรายโต๊ะ (Table Only)</strong>
+                          <small>เลือกโต๊ะว่างจากผังอีเวนต์ได้โดยตรง</small>
+                        </div>
+                        <strong className="zone-tier-price">—</strong>
+                      </div>
+                    );
+                  }
+
+                  return tiers.map((tier) => {
+                    const sortedCodes = [...tier.codes].sort((a, b) =>
+                      a.localeCompare(b, undefined, { numeric: true }),
+                    );
+                    const codeRange =
+                      sortedCodes.length > 1
+                        ? `${sortedCodes[0]}–${sortedCodes[sortedCodes.length - 1]}`
+                        : sortedCodes[0];
+                    return (
+                      <div
+                        key={`${tier.seats}-${tier.priceSatang}`}
+                        className="zone-tier-card"
+                      >
+                        <div>
+                          <strong>โต๊ะสำหรับ {tier.seats} ที่นั่ง</strong>
+                          <small>
+                            จองเป็นรายโต๊ะ · ทั้งหมด {tier.codes.length} โต๊ะ ({codeRange})
+                          </small>
                         </div>
                         <strong className="zone-tier-price">
-                          {(() => {
-                            const prices = [
-                              ...(zone.units || []),
-                              ...(zone.ticketTypes || []),
-                            ].map((t) => t.priceSatang);
-                            return prices.length
-                              ? money(Math.min(...prices))
-                              : "—";
-                          })()}
+                          {money(tier.priceSatang)}
                         </strong>
                       </div>
                     );

@@ -189,7 +189,7 @@ export async function getReports(eventId?: string) {
     receivedSatang,
     refundedSatang,
     netReceivedSatang: receivedSatang - refundedSatang,
-    soldAdmissions: admissions,
+    soldAdmissions: statusTotals.CONFIRMED?.admissions ?? admissions,
     checkedIn,
     pendingRefundCount: refundPending._count.id,
     pendingRefundSatang: refundPending._sum.amountSatang ?? 0,

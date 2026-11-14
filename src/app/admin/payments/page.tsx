@@ -1,4 +1,5 @@
-import { AdminBookings } from "@/features/admin/bookings";
+import { redirect } from "next/navigation";
+
 export default function AdminPaymentsPage() {
-  return <AdminBookings payments />;
+  redirect("/admin/bookings");
 }

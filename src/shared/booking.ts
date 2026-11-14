@@ -55,7 +55,11 @@ export const completeRefundSchema = z
 export const checkInSchema = z
   .object({
     eventId: objectIdSchema,
-    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, "รหัสบัตรไม่ถูกต้อง"),
+    token: z
+      .string()
+      .trim()
+      .min(6, "รหัสบัตรไม่ถูกต้อง")
+      .max(300, "รหัสบัตรไม่ถูกต้อง"),
   })
   .strict();
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;

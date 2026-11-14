@@ -99,6 +99,7 @@ export interface EventData {
   saleStartsAt: string;
   saleEndsAt: string;
   status: string;
+  showInSlider?: boolean;
   version: number;
   zones?: Zone[];
   units?: Unit[];
@@ -182,6 +183,11 @@ export interface Ticket {
   id: string;
   status: string;
   admissionSequence: number;
+  totalAdmissions: number;
+  checkedInCount: number;
+  remainingAdmissions: number;
+  ticketCode: string;
+  unitCode?: string | null;
   token: string;
   usedAt?: string | null;
   itemLabel: string;
@@ -190,9 +196,12 @@ export interface VerifiedTicketInspection {
   valid: boolean;
   ticketId: string;
   token: string;
+  ticketCode: string;
   status: "ACTIVE" | "USED" | "REVOKED" | string;
   admissionSequence: number;
   totalItemAdmissions: number;
+  checkedInCount: number;
+  remainingAdmissions: number;
   sellingMode: string;
   itemLabel: string;
   unitCode: string | null;
@@ -221,6 +230,7 @@ export interface VerifiedTicketInspection {
     status: string;
   };
   verification: {
+    ticketCode: string;
     verificationCode: string;
     sha256Fingerprint: string;
     fullHashPrefix: string;
@@ -231,6 +241,8 @@ export interface VerifiedTicketInspection {
     usedByStaff: string | null;
     revokedAt: string | null;
     checkInAttempts: number;
+    acceptedCheckIns: number;
+    checkInHistory: string[];
     serverVerifiedAt: string;
   };
 }

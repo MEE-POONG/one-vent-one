@@ -11,6 +11,8 @@ import {
   editEventInput,
   zoneInput,
   unitInput,
+  batchUnitInput,
+  batchPriceEditInput,
   ticketTypeInput,
   inventoryInput,
   poolInput,
@@ -36,8 +38,53 @@ export const ACTIVE_BOOKING_STATUSES = [
   "ACTION_REQUIRED",
   "CONFIRMED",
 ] as const;
+export async function attachShowInSlider<
+  T extends { slug: string; showInSlider?: boolean },
+>(items: T[]): Promise<(T & { showInSlider: boolean })[]> {
+  if (items.length === 0) return [];
+  if (items.every((item) => typeof item.showInSlider === "boolean")) {
+    return items as (T & { showInSlider: boolean })[];
+  }
+  const raw = (await prisma.$runCommandRaw({
+    find: "Event",
+    filter: { slug: { $in: items.map((item) => item.slug) } },
+    projection: { slug: 1, showInSlider: 1 },
+  })) as {
+    cursor?: { firstBatch?: Array<{ slug?: string; showInSlider?: boolean }> };
+  };
+  const map = new Map<string, boolean>();
+  for (const doc of raw.cursor?.firstBatch ?? []) {
+    if (typeof doc.slug === "string") {
+      map.set(doc.slug, Boolean(doc.showInSlider));
+    }
+  }
+  return items.map((item) => ({
+    ...item,
+    showInSlider:
+      typeof item.showInSlider === "boolean"
+        ? item.showInSlider
+        : Boolean(map.get(item.slug)),
+  }));
+}
+
+export async function setEventShowInSlider(
+  tx: Prisma.TransactionClient,
+  slug: string,
+  showInSlider?: boolean,
+) {
+  await tx.$runCommandRaw({
+    update: "Event",
+    updates: [
+      {
+        q: { slug },
+        u: { $set: { showInSlider: Boolean(showInSlider) } },
+      },
+    ],
+  });
+}
+
 export async function adminEvent(id: string) {
-  const event = await prisma.event.findUnique({
+  const rawEvent = await prisma.event.findUnique({
     where: { id },
     include: {
       zones: { include: { pools: true } },
@@ -48,7 +95,8 @@ export async function adminEvent(id: string) {
       publishedLayoutVersion: true,
     },
   });
-  if (!event) throw new DomainError("NOT_FOUND", "ไม่พบงาน", 404);
+  if (!rawEvent) throw new DomainError("NOT_FOUND", "ไม่พบงาน", 404);
+  const [event] = await attachShowInSlider([rawEvent]);
   // Counts let the admin UI show only the actions the server will accept
   // (delete needs zero bookings, returning to draft needs zero active bookings).
   const [bookingCount, activeBookingCount] = await Promise.all([
@@ -107,7 +155,7 @@ export async function listAdminEvents(
     ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
     ...(status ? { status } : {}),
   };
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     prisma.event.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -117,11 +165,16 @@ export async function listAdminEvents(
     }),
     prisma.event.count({ where }),
   ]);
+  const items = await attachShowInSlider(rawItems);
   return { items, total, page, pageSize };
 }
 export function eventData(input: z.infer<typeof createEventInput>) {
   return {
-    ...input,
+    slug: input.slug,
+    title: input.title,
+    description: input.description,
+    artists: input.artists,
+    venue: input.venue,
     posterUrl: input.posterUrl || null,
     startsAt: new Date(input.startsAt),
     endsAt: new Date(input.endsAt),
@@ -138,6 +191,7 @@ export async function createEvent(
   return idempotent(actor.id, "event:create", key, input, async (tx) => {
     await assertSlugFree(tx, input.slug);
     const event = await tx.event.create({ data: eventData(input) });
+    await setEventShowInSlider(tx, input.slug, input.showInSlider);
     await tx.layoutTemplate.create({
       data: {
         eventId: event.id,
@@ -148,7 +202,7 @@ export async function createEvent(
       },
     });
     await audit(tx, actor.id, "EVENT_CREATE", "Event", event.id);
-    return event;
+    return { ...event, showInSlider: Boolean(input.showInSlider) };
   });
 }
 export async function editEvent(
@@ -176,8 +230,10 @@ export async function editEvent(
       "VERSION_CONFLICT",
       "มีการแก้ไขงานจากหน้าต่างอื่น กรุณาโหลดใหม่",
     );
+    await setEventShowInSlider(tx, fields.slug, fields.showInSlider);
     await audit(tx, actor.id, "EVENT_UPDATE", "Event", id);
-    return tx.event.findUniqueOrThrow({ where: { id } });
+    const updated = await tx.event.findUniqueOrThrow({ where: { id } });
+    return { ...updated, showInSlider: Boolean(fields.showInSlider) };
   });
 }
 export async function changeEventStatus(
@@ -362,6 +418,35 @@ export async function createZone(
     },
   );
 }
+async function ensureDefaultZone(
+  tx: Prisma.TransactionClient,
+  actorId: string,
+  eventId: string,
+  sellingMode: "TABLE" | "SEAT" = "TABLE",
+) {
+  const existing = await tx.zone.findFirst({
+    where: { eventId, sellingMode },
+    orderBy: { id: "asc" },
+  });
+  if (existing) return existing;
+  const code = sellingMode === "TABLE" ? "TABLES" : "SEATS";
+  const taken = await tx.zone.findUnique({
+    where: { eventId_code: { eventId, code } },
+  });
+  const zone = await tx.zone.create({
+    data: {
+      eventId,
+      code: taken ? `${code}-${Date.now().toString(36).slice(-4)}` : code,
+      name: sellingMode === "TABLE" ? "โต๊ะภายในงาน" : "ที่นั่งภายในงาน",
+      sellingMode,
+      capacity: 0,
+      color: "#E11D48",
+    },
+  });
+  await audit(tx, actorId, "ZONE_CREATE", "Zone", zone.id);
+  return zone;
+}
+
 export async function createUnit(
   actor: Actor,
   eventId: string,
@@ -377,9 +462,11 @@ export async function createUnit(
     async (tx) => {
       await configurable(tx, eventId);
       await assertCodeFree(tx, "unit", eventId, input.code);
-      const zone = await tx.zone.findFirst({
-        where: { id: input.zoneId, eventId, sellingMode: input.sellingMode },
-      });
+      const zone = input.zoneId
+        ? await tx.zone.findFirst({
+            where: { id: input.zoneId, eventId, sellingMode: input.sellingMode },
+          })
+        : await ensureDefaultZone(tx, actor.id, eventId, input.sellingMode);
       invariant(zone, "VALIDATION_ERROR", "ประเภทหน่วยขายไม่ตรงกับโซน", 422);
       if (input.parentUnitId) {
         const parent = await tx.bookableUnit.findFirst({
@@ -399,11 +486,199 @@ export async function createUnit(
       }
       const { parentUnitId, ...fields } = input;
       const unit = await tx.bookableUnit.create({
-        data: { ...fields, eventId, parentTableId: parentUnitId ?? null },
+        data: {
+          ...fields,
+          zoneId: zone.id,
+          eventId,
+          parentTableId: parentUnitId ?? null,
+        },
       });
       await tx.unitInventory.create({ data: { eventId, unitId: unit.id } });
       await audit(tx, actor.id, "UNIT_CREATE", "BookableUnit", unit.id);
       return unit;
+    },
+  );
+}
+export async function createUnitsBatch(
+  actor: Actor,
+  eventId: string,
+  input: z.infer<typeof batchUnitInput>,
+  key: string,
+) {
+  requireRoles(actor, "ADMIN");
+  return idempotent(
+    actor.id,
+    `unit:batch-create:${eventId}`,
+    key,
+    input,
+    async (tx) => {
+      const event = await configurable(tx, eventId);
+      let targetZone = input.zoneId
+        ? await tx.zone.findFirst({
+            where: {
+              id: input.zoneId,
+              eventId,
+              sellingMode: input.sellingMode,
+            },
+          })
+        : null;
+      if (!targetZone && input.newZone) {
+        await assertCodeFree(tx, "zone", eventId, input.newZone.code);
+        targetZone = await tx.zone.create({
+          data: {
+            eventId,
+            code: input.newZone.code,
+            name: input.newZone.name,
+            sellingMode: input.sellingMode,
+            capacity: 0,
+            color: input.newZone.color,
+          },
+        });
+        await audit(tx, actor.id, "ZONE_CREATE", "Zone", targetZone.id);
+      }
+      if (!targetZone) {
+        targetZone = await ensureDefaultZone(
+          tx,
+          actor.id,
+          eventId,
+          input.sellingMode,
+        );
+      }
+      const seenCodes = new Set<string>();
+      for (const u of input.units) {
+        invariant(
+          !seenCodes.has(u.code),
+          "CODE_TAKEN",
+          `รหัส ${u.code} ซ้ำกันในรายการที่ต้องการเพิ่ม`,
+          409,
+        );
+        seenCodes.add(u.code);
+      }
+      const existing = await tx.bookableUnit.findMany({
+        where: { eventId, code: { in: [...seenCodes] } },
+        select: { code: true },
+      });
+      invariant(
+        existing.length === 0,
+        "CODE_TAKEN",
+        `รหัส ${existing.map((e) => e.code).join(", ")} ถูกใช้ในงานนี้แล้ว`,
+        409,
+      );
+      const createdUnits = [];
+      for (const u of input.units) {
+        const unit = await tx.bookableUnit.create({
+          data: {
+            eventId,
+            zoneId: targetZone.id,
+            code: u.code,
+            name: u.name,
+            sellingMode: input.sellingMode,
+            admissionCount: u.admissionCount,
+            priceSatang: u.priceSatang,
+          },
+        });
+        await tx.unitInventory.create({ data: { eventId, unitId: unit.id } });
+        createdUnits.push({
+          ...unit,
+          inventory: [{ status: "AVAILABLE", version: 0 }],
+        });
+      }
+      await audit(
+        tx,
+        actor.id,
+        "UNIT_BATCH_CREATE",
+        "Event",
+        eventId,
+        undefined,
+        {
+          zoneId: targetZone.id,
+          count: createdUnits.length,
+          firstCode: createdUnits[0]?.code,
+          lastCode: createdUnits[createdUnits.length - 1]?.code,
+        },
+      );
+      return {
+        zone: targetZone,
+        units: createdUnits,
+        eventVersion: event.version + 1,
+      };
+    },
+  );
+}
+export async function editUnitsBatchPrice(
+  actor: Actor,
+  eventId: string,
+  input: z.infer<typeof batchPriceEditInput>,
+  key: string,
+) {
+  requireRoles(actor, "ADMIN");
+  return idempotent(
+    actor.id,
+    `unit:batch-price:${eventId}`,
+    key,
+    input,
+    async (tx) => {
+      invariant(
+        input.priceSatang !== undefined || input.admissionCount !== undefined,
+        "VALIDATION_ERROR",
+        "กรุณาระบุราคาหรือจำนวนที่นั่งที่ต้องการปรับ",
+        422,
+      );
+      const fenced = await tx.event.updateMany({
+        where: {
+          id: eventId,
+          version: input.eventVersion,
+          status: { in: ["DRAFT", "PUBLISHED", "CLOSED"] },
+        },
+        data: { version: { increment: 1 } },
+      });
+      invariant(
+        fenced.count === 1,
+        "VERSION_CONFLICT",
+        "งานเปลี่ยนแปลง กรุณาโหลดใหม่",
+      );
+      const where: Prisma.BookableUnitWhereInput = {
+        eventId,
+        ...(input.zoneId ? { zoneId: input.zoneId } : {}),
+        ...(input.unitIds?.length ? { id: { in: input.unitIds } } : {}),
+      };
+      const result = await tx.bookableUnit.updateMany({
+        where,
+        data: {
+          ...(input.priceSatang !== undefined
+            ? { priceSatang: input.priceSatang }
+            : {}),
+          ...(input.admissionCount !== undefined
+            ? { admissionCount: input.admissionCount }
+            : {}),
+        },
+      });
+      invariant(
+        result.count > 0,
+        "NOT_FOUND",
+        "ไม่พบหน่วยขายที่ตรงตามเงื่อนไข",
+        404,
+      );
+      await audit(
+        tx,
+        actor.id,
+        "PRICE_BATCH_UPDATE",
+        "Event",
+        eventId,
+        input.reason,
+        {
+          zoneId: input.zoneId ?? null,
+          updatedCount: result.count,
+          priceSatang: input.priceSatang ?? null,
+          admissionCount: input.admissionCount ?? null,
+        },
+      );
+      return {
+        updatedCount: result.count,
+        priceSatang: input.priceSatang,
+        admissionCount: input.admissionCount,
+        eventVersion: input.eventVersion + 1,
+      };
     },
   );
 }

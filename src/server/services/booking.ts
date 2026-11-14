@@ -230,7 +230,7 @@ export async function createBooking(
     const holdExpiresAt = new Date(now.getTime() + 5 * 60_000);
     const booking = await tx.booking.create({
       data: {
-        bookingNumber: `OVO-${randomBytes(7).toString("hex").toUpperCase()}`,
+        bookingNumber: `MKB-${randomBytes(5).toString("hex").toUpperCase()}`,
         userId: actor.id,
         eventId: event.id,
         totalSatang,

@@ -7,7 +7,12 @@ import { DomainError, invariant } from "@/server/errors";
 import { requireRoles } from "@/server/permissions";
 import { idempotent } from "./idempotency";
 import type { Tx } from "./transaction";
-import { assertSlugFree, audit, eventData } from "./event-admin";
+import {
+  assertSlugFree,
+  audit,
+  eventData,
+  setEventShowInSlider,
+} from "./event-admin";
 import {
   type LayoutGeometry,
   createEventInput,
@@ -176,6 +181,7 @@ export async function duplicateEvent(
       invariant(source, "NOT_FOUND", "ไม่พบงานต้นฉบับ", 404);
       await assertSlugFree(tx, input.slug);
       const event = await tx.event.create({ data: eventData(input) });
+      await setEventShowInSlider(tx, input.slug, input.showInSlider);
       const eventId = event.id;
       const zoneIds = new Map(source.zones.map((z) => [z.id, newId()]));
       const poolIds = new Map(source.pools.map((p) => [p.id, newId()]));
