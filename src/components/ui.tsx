@@ -271,15 +271,6 @@ export function EventCard({ event }: { event: EventData }) {
         href={detailsHref}
         aria-label={`ดู ${event.title}`}
       >
-        <span className="event-card-layer event-card-ambient" aria-hidden="true">
-          <Image
-            src={event.posterUrl || "/concert-hero.png"}
-            alt=""
-            fill
-            sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 45vw, 384px"
-            unoptimized={!!event.posterUrl?.startsWith("https:")}
-          />
-        </span>
         <span className="event-card-layer event-card-bg" aria-hidden="true">
           <Image
             src={event.posterUrl || "/concert-hero.png"}

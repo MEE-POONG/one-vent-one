@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { SiteHeader } from "@/components/site-header";
-import { RouteLoading, SiteLoadingProvider } from "@/components/site-loading";
 import { getBusinessProfile } from "@/server/services/catalog";
 import { oneVentOneLogo } from "@/shared/images";
 import { publicSocialLinks } from "@/shared/contact";
@@ -148,11 +147,9 @@ export default function RootLayout({
   return (
     <html lang="th" data-scroll-behavior="smooth">
       <body>
-        <SiteLoadingProvider logo={oneVentOneLogo}>
-          <Suspense fallback={<RouteLoading />}>
-            <SiteContent>{children}</SiteContent>
-          </Suspense>
-        </SiteLoadingProvider>
+        <Suspense fallback={null}>
+          <SiteContent>{children}</SiteContent>
+        </Suspense>
       </body>
     </html>
   );
