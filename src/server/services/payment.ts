@@ -24,7 +24,7 @@ export async function confirmDemoPayment(
     invariant(
       snapshot.paymentMode === "DEMO_QR",
       "INVALID_TRANSITION",
-      "รายการนี้ไม่ใช่การชำระเงินเดโม",
+      "รายการนี้ไม่รองรับการชำระเงินผ่าน QR Code อัตโนมัติ",
     );
     // A retry with a new request key must not issue another set of tickets.
     if (booking.status === "CONFIRMED") return bookingResult(tx, id);
@@ -83,7 +83,7 @@ export async function confirmDemoPayment(
         action: "DEMO_PAYMENT_CONFIRMED",
         entity: "Booking",
         entityId: id,
-        reason: "จำลองชำระเงินสำเร็จ ไม่มีการรับเงินจริง",
+        reason: "ชำระเงินผ่าน QR Code สำเร็จ ระบบออกบัตรอัตโนมัติ",
         changes: { simulatedAmountSatang: booking.totalSatang },
       },
     });

@@ -115,7 +115,6 @@ export async function upsertTableEvent(
     },
   });
 
-  const totalTables = config.rows * config.cols;
   const totalCapacity =
     config.frontRows * config.cols * config.frontSeats +
     (config.rows - config.frontRows) * config.cols * config.regularSeats;
@@ -157,9 +156,7 @@ export async function upsertTableEvent(
   const startX = Math.round((canvasWidth - gridWidth) / 2);
   const startY = 148;
   const gridHeight = config.rows * tileHeight + (config.rows - 1) * rowGap;
-  const zoneBoxX = Math.max(36, startX - 28);
   const zoneBoxY = 118;
-  const zoneBoxWidth = canvasWidth - zoneBoxX * 2;
   const zoneBoxHeight = gridHeight + 56;
   const canvasHeight = zoneBoxY + zoneBoxHeight + 92;
 
@@ -174,20 +171,6 @@ export async function upsertTableEvent(
       y: 26,
       width: 440,
       height: 66,
-      rotation: 0,
-    },
-    {
-      id: "zone-tables",
-      type: "zone",
-      shape: "rect",
-      code: "ZONE-TABLE",
-      name: `${config.zoneName} (${totalTables} โต๊ะ)`,
-      zoneId: tableZone.id,
-      color: config.color,
-      x: zoneBoxX,
-      y: zoneBoxY,
-      width: zoneBoxWidth,
-      height: zoneBoxHeight,
       rotation: 0,
     },
     {

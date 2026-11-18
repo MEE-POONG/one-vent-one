@@ -3,18 +3,46 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  RefreshCw,
+  Ticket as TicketIcon,
+  UserCheck,
+} from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { api, ApiError, useResource } from "@/lib/client-api";
-import type { Availability, Booking, EventData } from "@/lib/client-types";
+import type {
+  Availability,
+  Booking,
+  BookingItem,
+  EventData,
+} from "@/lib/client-types";
 import {
+  dateTime,
   Empty,
   ErrorNotice,
   Loading,
   money,
   PageHeading,
+  Status,
 } from "@/components/ui";
 import { VenueView } from "@/components/venue-view";
+
+function formatBookingItemLabel(item: BookingItem) {
+  const snap = item.snapshot || {};
+  if (item.sellingMode === "TABLE") {
+    const label = String(snap.unitName || snap.unitCode || "โต๊ะ");
+    return `${label} (${item.admissionCount} ที่นั่ง)`;
+  }
+  if (item.sellingMode === "SEAT") {
+    return String(snap.unitName || snap.unitCode || "ที่นั่ง");
+  }
+  const zoneOrTicket = String(
+    snap.ticketTypeName || snap.zoneName || snap.unitName || "บัตรเข้างาน",
+  );
+  return `${zoneOrTicket} × ${item.quantity} ใบ`;
+}
 
 export function BookingPicker({ slug }: { slug: string }) {
   const router = useRouter();
@@ -28,6 +56,16 @@ export function BookingPicker({ slug }: { slug: string }) {
     event ? `/api/events/${event.id}/availability` : null,
     7000,
   );
+  const myBookingsResource = useResource<{
+    bookings: Booking[];
+    total: number;
+  }>(
+    event && session?.user
+      ? `/api/me/bookings?eventId=${encodeURIComponent(event.id)}&pageSize=20`
+      : null,
+    10000,
+  );
+  const myEventBookings = myBookingsResource.data?.bookings ?? [];
   const [selected, setSelected] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [accepted, setAccepted] = useState(false);
@@ -135,7 +173,7 @@ export function BookingPicker({ slug }: { slug: string }) {
             <span /> INTERACTIVE FLOOR PLAN
           </div>
           <PageHeading
-            title="เลือกโต๊ะ ที่นั่ง หรือบัตรยืน"
+            title="เลือกโต๊ะหรือโซนบัตรเข้างาน"
             description={event.title}
           />
         </div>
@@ -143,14 +181,14 @@ export function BookingPicker({ slug }: { slug: string }) {
           <div className="stack">
             <div className="notice">
               การเลือกในหน้านี้ยังไม่พักสิทธิ์
-              ที่นั่งจะถูกกันไว้เมื่อสร้างการจองสำเร็จเท่านั้น
+              สิทธิ์จะถูกล็อกไว้ให้ 5 นาทีเมื่อกดยืนยันสร้างการจอง
             </div>
             <div className="customer-card">
               <div className="between floorplan-card-head">
                 <div>
-                  <h3 className="floorplan-section-title">เลือกโต๊ะของคุณ</h3>
+                  <h3 className="floorplan-section-title">เลือกโต๊ะหรือโซนจากผัง</h3>
                   <p className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
-                    คลิกเลือกโต๊ะว่างสีเขียวจากผังด้านล่าง
+                    คลิกเลือกโต๊ะหรือโซนที่ต้องการจากผังด้านล่างได้โดยตรง
                   </p>
                 </div>
                 <button
@@ -164,7 +202,7 @@ export function BookingPicker({ slug }: { slug: string }) {
               </div>
               <div
                 className="floorplan-legend"
-                aria-label="สัญลักษณ์สถานะการจองโต๊ะ"
+                aria-label="สัญลักษณ์สถานะการจอง"
               >
                 <span className="floorplan-legend-item">
                   <i
@@ -175,7 +213,7 @@ export function BookingPicker({ slug }: { slug: string }) {
                 </span>
                 <span className="floorplan-legend-item">
                   <i className="floorplan-swatch is-sold" aria-hidden="true" />
-                  <span>จองแล้ว</span>
+                  <span>เต็ม / จองแล้ว</span>
                 </span>
                 <span className="floorplan-legend-item">
                   <i
@@ -216,17 +254,26 @@ export function BookingPicker({ slug }: { slug: string }) {
                   units={units}
                   selected={selected}
                   onSelect={toggle}
+                  zones={data.zones || event.zones || []}
+                  ticketTypes={ticketTypes}
+                  pools={data.pools || []}
+                  selectedQuantities={quantities}
+                  onChangeZoneQuantity={(ticketTypeId, nextQty) =>
+                    setQuantities((q) => ({
+                      ...q,
+                      [ticketTypeId]: nextQty,
+                    }))
+                  }
                 />
               ) : (
-                <Empty title="ยังไม่มีผังโต๊ะเปิดขาย" />
+                <Empty title="ยังไม่มีผังเปิดจำหน่าย" />
               )}
             </div>
             {ticketTypes.length > 0 ? (
               <section className="customer-card stack">
-                <h3>บัตรยืน / เข้าชมตามโซน</h3>
+                <h3>โซนบัตรเข้างาน</h3>
                 <p className="muted">
-                  เลือกจำนวนบัตร ไม่ระบุที่นั่ง
-                  แต่ละราคาในโซนเดียวกันใช้โควตาร่วมกัน
+                  คลิกเลือกโซนจากผังด้านบน หรือปรับจำนวนบัตรของโซนที่ต้องการได้ที่นี่
                 </p>
                 {ticketTypes.map((ticket) => {
                   const pool = data?.pools.find((p) => p.id === ticket.poolId);
@@ -245,23 +292,35 @@ export function BookingPicker({ slug }: { slug: string }) {
                     Date.parse(ticket.saleStartsAt) <= now &&
                     Date.parse(ticket.saleEndsAt) > now;
                   const zone = event.zones?.find((z) => z.id === ticket.zoneId);
+                  const currentQty = quantities[ticket.id] || 0;
                   return (
-                    <div key={ticket.id} className="zone-tier-card">
+                    <div
+                      key={ticket.id}
+                      className="zone-tier-card"
+                      style={
+                        currentQty > 0
+                          ? {
+                              borderColor: "#f59e0b",
+                              background: "linear-gradient(145deg, #3d2c1480, #16161eb3)",
+                            }
+                          : undefined
+                      }
+                    >
                       <div>
                         <strong>{zone?.name || ticket.name}</strong>
                         <p>
-                          {ticket.name} · {money(ticket.priceSatang)} / คน
+                          {money(ticket.priceSatang)} / ใบ
                         </p>
                         <small className="muted">
                           {onSale
-                            ? `โควตาคงเหลือ ${available} คน`
+                            ? `คงเหลือ ${available} ใบ`
                             : "อยู่นอกช่วงจำหน่าย"}
                         </small>
                       </div>
                       <label className="field">
-                        <span>จำนวนบัตร {ticket.name}</span>
+                        <span>จำนวนบัตร</span>
                         <select
-                          value={quantities[ticket.id] || 0}
+                          value={currentQty}
                           disabled={!onSale || pending}
                           onChange={(e) =>
                             setQuantities((q) => ({
@@ -272,8 +331,7 @@ export function BookingPicker({ slug }: { slug: string }) {
                         >
                           {Array.from(
                             {
-                              length:
-                                Math.max(max, quantities[ticket.id] || 0) + 1,
+                              length: Math.max(max, currentQty) + 1,
                             },
                             (_, n) => (
                               <option key={n} value={n} disabled={n > max}>
@@ -288,6 +346,125 @@ export function BookingPicker({ slug }: { slug: string }) {
                 })}
               </section>
             ) : null}
+
+            <section className="customer-card stack">
+              <div
+                className="between"
+                style={{ gap: 12, flexWrap: "wrap", alignItems: "center" }}
+              >
+                <div>
+                  <div className="section-kicker" style={{ marginBottom: 6 }}>
+                    <span /> MY EVENT BOOKINGS
+                  </div>
+                  <h3 style={{ margin: 0 }}>
+                    รายการจองของฉันในอีเวนต์นี้
+                    {myEventBookings.length > 0
+                      ? ` (${myEventBookings.length} รายการ)`
+                      : ""}
+                  </h3>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                    ตรวจสอบโต๊ะหรือบัตรโซนที่คุณทำรายการไว้ในงานนี้ และกดเปิดดูบัตรเข้างานได้ทันที
+                  </p>
+                </div>
+                <Link href="/account/bookings" className="view-all-button">
+                  <span>ดูการจองทั้งหมด</span>
+                  <ArrowRight size={15} />
+                </Link>
+              </div>
+
+              {!session?.user && !sessionPending ? (
+                <div className="notice" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <span>เข้าสู่ระบบเพื่อดูรายการจองและบัตรเข้างานของคุณในอีเวนต์นี้</span>
+                  <Link href={loginHref} className="mongkol-button">
+                    เข้าสู่ระบบ
+                  </Link>
+                </div>
+              ) : myBookingsResource.loading && !myBookingsResource.data ? (
+                <Loading />
+              ) : myEventBookings.length > 0 ? (
+                <div className="booking-card-list">
+                  {myEventBookings.map((booking) => {
+                    const totalSeats = booking.items.reduce(
+                      (sum, item) => sum + (item.admissionCount || item.quantity || 0),
+                      0,
+                    );
+                    const isPendingPayment =
+                      booking.status === "PENDING_PAYMENT";
+                    const isConfirmed = booking.status === "CONFIRMED";
+                    const targetHref = isPendingPayment
+                      ? `/checkout/${booking.id}`
+                      : `/account/bookings/${booking.id}`;
+                    return (
+                      <article className="booking-row" key={booking.id}>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Status value={booking.status} />
+                            <span
+                              className="muted"
+                              style={{ fontSize: 12, fontWeight: 600 }}
+                            >
+                              #{booking.bookingNumber}
+                              {booking.createdAt
+                                ? ` · ${dateTime(booking.createdAt)}`
+                                : ""}
+                            </span>
+                          </div>
+                          <div
+                            className="event-card-tags"
+                            style={{ marginTop: 10 }}
+                          >
+                            {booking.items.map((item) => (
+                              <span
+                                key={item.id}
+                                style={{
+                                  background: "#22c55e1f",
+                                  borderColor: "#22c55e66",
+                                  color: "#dcfce7",
+                                  fontSize: 12,
+                                }}
+                              >
+                                {formatBookingItemLabel(item)}
+                              </span>
+                            ))}
+                          </div>
+                          <p
+                            className="muted"
+                            style={{ fontSize: 12.5, marginTop: 8 }}
+                          >
+                            รวมทั้งหมด {totalSeats} สิทธิ์เข้างาน
+                          </p>
+                        </div>
+                        <div className="booking-row-right">
+                          <strong>{money(booking.totalSatang)}</strong>
+                          <Link href={targetHref} className="mongkol-button">
+                            <TicketIcon size={15} />
+                            <span>
+                              {isPendingPayment
+                                ? "ไปชำระเงิน"
+                                : isConfirmed
+                                  ? "เปิดดูบัตร / การจอง"
+                                  : "ดูรายละเอียด"}
+                            </span>
+                            <ArrowRight size={15} />
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                  คุณยังไม่มีรายการจองในอีเวนต์นี้ เลือกโต๊ะหรือโซนจากผังด้านบนเพื่อทำรายการจองได้เลย
+                </p>
+              )}
+            </section>
           </div>
           <aside className="panel sticky-panel customer-sticky-card">
             <div className="section-kicker" style={{ marginBottom: 8 }}>
@@ -316,38 +493,66 @@ export function BookingPicker({ slug }: { slug: string }) {
                       {u.name || u.code}
                       <small>
                         {u.sellingMode === "TABLE" ? "1 โต๊ะ" : "1 ที่นั่ง"} ·{" "}
-                        {u.admissionCount} สิทธิ์เข้า
+                        {u.admissionCount} สิทธิ์เข้างาน
                       </small>
                     </span>
                     <strong>{money(u.priceSatang)}</strong>
                   </li>
                 ))}
-                {selectedTypes.map((ticket) => (
-                  <li key={ticket.id}>
-                    <span>
-                      {ticket.name}
-                      <small>บัตรยืน {quantities[ticket.id]} ใบ</small>
-                    </span>
-                    <strong>
-                      {money(ticket.priceSatang * quantities[ticket.id])}
-                    </strong>
-                  </li>
-                ))}
+                {selectedTypes.map((ticket) => {
+                  const pool = data?.pools.find((p) => p.id === ticket.poolId);
+                  const available = pool?.available ?? 20;
+                  const maxQty = Math.min(20, Math.max(1, available));
+                  const currentQty = quantities[ticket.id] || 1;
+                  return (
+                    <li key={ticket.id}>
+                      <span>
+                        {ticket.name}
+                        <small>
+                          บัตรเข้างานแยก {currentQty} ใบ ({money(ticket.priceSatang)} / ใบ)
+                        </small>
+                        <select
+                          className="summary-qty-select"
+                          aria-label={`จำนวนบัตร ${ticket.name}`}
+                          value={currentQty}
+                          disabled={pending}
+                          onChange={(e) =>
+                            setQuantities((q) => ({
+                              ...q,
+                              [ticket.id]: Number(e.target.value),
+                            }))
+                          }
+                        >
+                          <option value={0}>0 ใบ (ยกเลิก)</option>
+                          {Array.from(
+                            { length: Math.max(maxQty, currentQty) },
+                            (_, idx) => idx + 1,
+                          ).map((n) => (
+                            <option key={n} value={n} disabled={n > maxQty}>
+                              จำนวน {n} ใบ
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                      <strong>
+                        {money(ticket.priceSatang * currentQty)}
+                      </strong>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="muted" style={{ fontSize: 13 }}>
-                เลือกโต๊ะจากผัง หรือระบุจำนวนบัตรของโซนที่ต้องการ
+                คลิกเลือกโต๊ะหรือโซนที่ต้องการจากผังเพื่อทำรายการจอง
               </p>
             )}
             <div className="summary-row">
-              <span className="muted">จำนวนสิทธิ์เข้า</span>
-              <strong>{admissions} คน</strong>
+              <span className="muted">จำนวนสิทธิ์เข้างาน</span>
+              <strong>{admissions} ท่าน</strong>
             </div>
             <div className="summary-row summary-total">
               <div>
-                <span className="muted">ยอดประมาณจากราคาปัจจุบัน</span>
-                <br />
-                <small className="muted">ยอดยืนยันแสดงในขั้นตอนถัดไป</small>
+                <span className="muted">ยอดชำระรวม</span>
               </div>
               <strong>{money(estimatedTotal)}</strong>
             </div>
@@ -358,8 +563,7 @@ export function BookingPicker({ slug }: { slug: string }) {
                 onChange={(e) => setAccepted(e.target.checked)}
               />
               <span>
-                รับทราบเงื่อนไขการจอง และจะทดสอบชำระเงินผ่าน QR ภายใน 5 นาที
-                (เดโม ไม่มีการรับเงินจริง)
+                ยอมรับเงื่อนไขการจอง และชำระเงินผ่าน QR Code ภายใน 5 นาที
               </span>
             </label>
             <ErrorNotice error={error} />

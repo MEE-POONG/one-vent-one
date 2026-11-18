@@ -303,18 +303,148 @@ export async function updateZone(
 ) {
   requireRoles(actor, "ADMIN");
   return idempotent(actor.id, `zone:edit:${zoneId}`, key, input, async (tx) => {
-    // Name and colour are display-only; booking snapshots keep their own copy.
     await fenceEvent(tx, eventId, input.eventVersion, EDITABLE);
-    const result = await tx.zone.updateMany({
+    const event = await tx.event.findUniqueOrThrow({ where: { id: eventId } });
+    const zone = await tx.zone.findFirst({
       where: { id: zoneId, eventId },
-      data: { name: input.name, color: input.color },
+      include: { pools: true, ticketTypes: true },
     });
-    invariant(result.count === 1, "NOT_FOUND", "ไม่พบโซน", 404);
+    invariant(zone, "NOT_FOUND", "ไม่พบโซน", 404);
+
+    let poolId = zone.pools[0]?.id;
+    if (input.capacity !== undefined && zone.pools[0]) {
+      const pool = zone.pools[0];
+      const delta = input.capacity - pool.capacity;
+      invariant(
+        pool.available + delta >= 0,
+        "INVENTORY_UNAVAILABLE",
+        "จำนวนบัตรใหม่ต่ำกว่าจำนวนที่มีผู้จองแล้ว",
+      );
+      await tx.capacityPool.update({
+        where: { id: pool.id },
+        data: {
+          capacity: input.capacity,
+          available: { increment: delta },
+          version: { increment: 1 },
+        },
+      });
+    } else if (
+      (input.capacity !== undefined || input.priceSatang !== undefined) &&
+      !poolId
+    ) {
+      const cap = input.capacity ?? (zone.capacity > 0 ? zone.capacity : 100);
+      const createdPool = await tx.capacityPool.create({
+        data: {
+          eventId,
+          zoneId,
+          code: `POOL-${zone.code}`,
+          capacity: cap,
+          available: cap,
+        },
+      });
+      poolId = createdPool.id;
+    }
+
+    await tx.zone.update({
+      where: { id: zoneId },
+      data: {
+        name: input.name,
+        ...(input.color ? { color: input.color } : {}),
+        ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
+      },
+    });
+
+    if (zone.ticketTypes.length > 0) {
+      await tx.ticketType.updateMany({
+        where: { zoneId, eventId },
+        data: {
+          name: input.name,
+          ...(input.priceSatang !== undefined
+            ? { priceSatang: input.priceSatang, active: true }
+            : {}),
+        },
+      });
+    } else if (input.priceSatang !== undefined && poolId) {
+      const baseCode = `TT-${zone.code}`.slice(0, 32);
+      const existingCode = await tx.ticketType.findUnique({
+        where: { eventId_code: { eventId, code: baseCode } },
+      });
+      await tx.ticketType.create({
+        data: {
+          eventId,
+          zoneId,
+          poolId,
+          code: existingCode ? `${baseCode}-${newId().slice(0, 4)}` : baseCode,
+          name: input.name,
+          priceSatang: input.priceSatang,
+          saleStartsAt: event.saleStartsAt,
+          saleEndsAt: event.saleEndsAt,
+          active: true,
+        },
+      });
+    }
+
+    const draft = await tx.layoutTemplate.findUnique({ where: { eventId } });
+    if (draft) {
+      const geometry = draft.geometry as unknown as LayoutGeometry | null;
+      const objects = geometry?.objects ?? [];
+      let changedLayout = false;
+      const nextObjects = objects.map((o) => {
+        if (o.type === "zone" && o.zoneId === zoneId && o.name !== input.name) {
+          changedLayout = true;
+          return { ...o, name: input.name };
+        }
+        return o;
+      });
+      if (changedLayout) {
+        await tx.layoutTemplate.update({
+          where: { id: draft.id },
+          data: {
+            geometry: { objects: nextObjects } as Prisma.InputJsonValue,
+          },
+        });
+      }
+    }
+
+    if (event.publishedLayoutVersionId) {
+      const published = await tx.layoutVersion.findUnique({
+        where: { id: event.publishedLayoutVersionId },
+      });
+      if (published) {
+        const geometry = published.geometry as unknown as LayoutGeometry | null;
+        const objects = geometry?.objects ?? [];
+        let changedPublished = false;
+        const nextObjects = objects.map((o) => {
+          if (
+            o.type === "zone" &&
+            o.zoneId === zoneId &&
+            o.name !== input.name
+          ) {
+            changedPublished = true;
+            return { ...o, name: input.name };
+          }
+          return o;
+        });
+        if (changedPublished) {
+          await tx.layoutVersion.update({
+            where: { id: published.id },
+            data: {
+              geometry: { objects: nextObjects } as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+    }
+
     await audit(tx, actor.id, "ZONE_UPDATE", "Zone", zoneId, undefined, {
       name: input.name,
-      color: input.color,
+      priceSatang: input.priceSatang,
+      capacity: input.capacity,
     });
-    return tx.zone.findUniqueOrThrow({ where: { id: zoneId } });
+    return tx.zone.findUniqueOrThrow({
+      where: { id: zoneId },
+      include: { pools: true, ticketTypes: true },
+    });
   });
 }
 
@@ -338,22 +468,28 @@ export async function deleteZone(
         include: {
           _count: { select: { units: true, ticketTypes: true } },
           pools: { select: { id: true } },
+          ticketTypes: { select: { id: true } },
         },
       });
       invariant(zone, "NOT_FOUND", "ไม่พบโซน", 404);
       invariant(
-        zone._count.units === 0 && zone._count.ticketTypes === 0,
+        zone._count.units === 0,
         "INVALID_TRANSITION",
-        "ลบหน่วยขายและประเภทบัตรในโซนนี้ก่อน",
+        "ลบหน่วยขายในโซนนี้ก่อน",
       );
       const poolIds = zone.pools.map((p) => p.id);
+      const ticketTypeIds = zone.ticketTypes.map((t) => t.id);
       invariant(
         (await tx.capacityAllocation.count({
           where: { poolId: { in: poolIds } },
-        })) === 0,
+        })) === 0 &&
+          (await tx.bookingItem.count({
+            where: { ticketTypeId: { in: ticketTypeIds } },
+          })) === 0,
         "INVALID_TRANSITION",
-        "โควตาของโซนนี้มีประวัติการจอง",
+        "โซนนี้มีประวัติการจองแล้ว ไม่สามารถลบได้",
       );
+      await tx.ticketType.deleteMany({ where: { id: { in: ticketTypeIds } } });
       await tx.capacityPool.deleteMany({ where: { id: { in: poolIds } } });
       await tx.zone.delete({ where: { id: zoneId } });
       const layoutObjectsRemoved = await pruneDraftLayout(tx, eventId, {

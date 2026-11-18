@@ -94,10 +94,23 @@ export function extractUnitCodeFromSnapshot(snapshot: unknown): string {
   );
 }
 
+export function ticketCodeFor(ticket: {
+  tokenHash: string;
+  admissionSequence: number;
+  bookingItem: { sellingMode: string; snapshot: unknown };
+}): string {
+  const uCode = extractUnitCodeFromSnapshot(ticket.bookingItem.snapshot);
+  const codeSeed =
+    ticket.bookingItem.sellingMode === "TABLE"
+      ? uCode
+      : `${uCode}-${String(ticket.admissionSequence).padStart(3, "0")}`;
+  return buildTicketCode(codeSeed, ticket.tokenHash);
+}
+
 /**
- * Issues exactly ONE ticket per booked table (BookingItem), regardless of how many seats
- * (`admissionCount`) are in the table. All guests sharing the table use this single pass
- * up to `item.admissionCount` check-ins.
+ * - For TABLE items: issues 1 shared table pass per table (valid for `item.admissionCount` check-ins).
+ * - For non-TABLE items (e.g. GENERAL_ADMISSION zone tickets): issues separate individual tickets
+ *   (`1..item.admissionCount`, up to 20 tickets), each valid for 1 check-in.
  */
 export async function issueTickets(tx: Tx, bookingId: string) {
   const booking = await tx.booking.findUniqueOrThrow({
@@ -111,20 +124,23 @@ export async function issueTickets(tx: Tx, bookingId: string) {
   );
   const tickets = [];
   for (const item of booking.items) {
-    const sequence = 1;
-    const token = randomBytes(32).toString("base64url");
-    tickets.push({
-      bookingId,
-      bookingItemId: item.id,
-      eventId: booking.eventId,
-      ownerId: booking.userId,
-      admissionSequence: sequence,
-      tokenHash: hashTicketToken(token),
-      encryptedToken: protectToken(
-        token,
-        `${bookingId}:${item.id}:${sequence}`,
-      ),
-    });
+    const ticketCount =
+      item.sellingMode === "TABLE" ? 1 : Math.max(1, item.admissionCount);
+    for (let sequence = 1; sequence <= ticketCount; sequence++) {
+      const token = randomBytes(32).toString("base64url");
+      tickets.push({
+        bookingId,
+        bookingItemId: item.id,
+        eventId: booking.eventId,
+        ownerId: booking.userId,
+        admissionSequence: sequence,
+        tokenHash: hashTicketToken(token),
+        encryptedToken: protectToken(
+          token,
+          `${bookingId}:${item.id}:${sequence}`,
+        ),
+      });
+    }
   }
   await tx.ticket.createMany({ data: tickets });
 }
@@ -145,23 +161,27 @@ export async function getTickets(actor: Actor, bookingId: string) {
     orderBy: [{ bookingItemId: "asc" }, { admissionSequence: "asc" }],
   });
 
-  // Deduplicate by bookingItemId so each booked table always shows 1 single pass
-  const seenItemIds = new Set<string>();
-  const primaryTickets = allTickets.filter((t) => {
-    if (seenItemIds.has(t.bookingItemId)) return false;
-    seenItemIds.add(t.bookingItemId);
+  // Deduplicate by bookingItemId only for TABLE mode (1 table = 1 pass);
+  // Zone / non-table tickets stay separate (e.g. buying 20 zone tickets yields 20 separate passes).
+  const seenTableItemIds = new Set<string>();
+  const visibleTickets = allTickets.filter((t) => {
+    if (t.bookingItem.sellingMode !== "TABLE") return true;
+    if (seenTableItemIds.has(t.bookingItemId)) return false;
+    seenTableItemIds.add(t.bookingItemId);
     return true;
   });
 
   return {
-    tickets: primaryTickets.map((ticket) => {
+    tickets: visibleTickets.map((ticket) => {
       const snap = (ticket.bookingItem.snapshot ?? {}) as Record<
         string,
         unknown
       >;
-      const unitCode = extractUnitCodeFromSnapshot(snap);
-      const ticketCode = buildTicketCode(unitCode, ticket.tokenHash);
-      const totalAdmissions = Math.max(1, ticket.bookingItem.admissionCount);
+      const isTable = ticket.bookingItem.sellingMode === "TABLE";
+      const ticketCode = ticketCodeFor(ticket);
+      const totalAdmissions = isTable
+        ? Math.max(1, ticket.bookingItem.admissionCount)
+        : 1;
       const checkedInCount = ticket.checkIns.length;
       const remainingAdmissions = Math.max(0, totalAdmissions - checkedInCount);
       const effectiveStatus =
@@ -170,23 +190,29 @@ export async function getTickets(actor: Actor, bookingId: string) {
           : ticket.status === "USED" || checkedInCount >= totalAdmissions
             ? "USED"
             : "ACTIVE";
+      const baseLabel = String(
+        snap.unitName ||
+          snap.ticketTypeName ||
+          snap.zoneName ||
+          snap.unitCode ||
+          "บัตรเข้างาน",
+      );
+      const itemLabel =
+        !isTable && ticket.bookingItem.admissionCount > 1
+          ? `${baseLabel} (ใบที่ ${ticket.admissionSequence}/${ticket.bookingItem.admissionCount})`
+          : baseLabel;
 
       return {
         id: ticket.id,
         status: effectiveStatus,
-        admissionSequence: 1,
+        admissionSequence: ticket.admissionSequence,
         totalAdmissions,
         checkedInCount,
         remainingAdmissions,
         ticketCode,
         unitCode: snap.unitCode ? String(snap.unitCode) : null,
         usedAt: ticket.usedAt,
-        itemLabel: String(
-          snap.unitName ||
-            snap.ticketTypeName ||
-            snap.unitCode ||
-            "บัตรเข้างาน",
-        ),
+        itemLabel,
         token:
           ticket.status === "REVOKED"
             ? undefined
@@ -261,16 +287,12 @@ export async function inspectTicketByToken(rawInput: string) {
     });
   } else {
     const candidates = await prisma.ticket.findMany({
-      where: { admissionSequence: 1 },
       include: includeSpec,
       orderBy: { createdAt: "desc" },
       take: 2500,
     });
     ticket =
-      candidates.find((t) => {
-        const uCode = extractUnitCodeFromSnapshot(t.bookingItem.snapshot);
-        return buildTicketCode(uCode, t.tokenHash) === parsed.value;
-      }) ?? null;
+      candidates.find((t) => ticketCodeFor(t) === parsed.value) ?? null;
   }
 
   if (!ticket) {
@@ -289,13 +311,15 @@ export async function inspectTicketByToken(rawInput: string) {
     string,
     unknown
   >;
-  const unitCodeStr = extractUnitCodeFromSnapshot(itemSnap);
-  const ticketCode = buildTicketCode(unitCodeStr, ticket.tokenHash);
+  const isTable = ticket.bookingItem.sellingMode === "TABLE";
+  const ticketCode = ticketCodeFor(ticket);
 
   const acceptedCheckIns = ticket.checkIns.filter(
     (c) => c.result === "ACCEPTED",
   );
-  const totalItemAdmissions = Math.max(1, ticket.bookingItem.admissionCount);
+  const totalItemAdmissions = isTable
+    ? Math.max(1, ticket.bookingItem.admissionCount)
+    : 1;
   const checkedInCount = acceptedCheckIns.length;
   const remainingAdmissions = Math.max(0, totalItemAdmissions - checkedInCount);
 
@@ -325,6 +349,18 @@ export async function inspectTicketByToken(rawInput: string) {
     }
   }
 
+  const baseLabel = String(
+    itemSnap.unitName ||
+      itemSnap.ticketTypeName ||
+      itemSnap.zoneName ||
+      itemSnap.unitCode ||
+      "บัตรเข้างาน",
+  );
+  const itemLabel =
+    !isTable && ticket.bookingItem.admissionCount > 1
+      ? `${baseLabel} (ใบที่ ${ticket.admissionSequence}/${ticket.bookingItem.admissionCount})`
+      : baseLabel;
+
   return {
     valid: isGenuineActive,
     canCheckIn:
@@ -337,17 +373,12 @@ export async function inspectTicketByToken(rawInput: string) {
     token: revealedToken,
     ticketCode,
     status: effectiveStatus,
-    admissionSequence: 1,
+    admissionSequence: ticket.admissionSequence,
     totalItemAdmissions,
     checkedInCount,
     remainingAdmissions,
     sellingMode: ticket.bookingItem.sellingMode,
-    itemLabel: String(
-      itemSnap.unitName ||
-        itemSnap.ticketTypeName ||
-        itemSnap.unitCode ||
-        "บัตรเข้างาน",
-    ),
+    itemLabel,
     unitCode: itemSnap.unitCode ? String(itemSnap.unitCode) : null,
     zoneName: String(itemSnap.zoneName || "โต๊ะภายในงาน"),
     holderName: ticket.owner.name,

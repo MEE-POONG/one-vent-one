@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
-import type { Unit, VenueLayout } from "@/lib/client-types";
+import type { Pool, TicketType, Unit, VenueLayout, Zone } from "@/lib/client-types";
 
 function TableSeatIcon({ compact = false }: { compact?: boolean }) {
   return (
@@ -52,12 +52,22 @@ export function VenueView({
   units = [],
   selected = [],
   onSelect,
+  zones = [],
+  ticketTypes = [],
+  pools = [],
+  selectedQuantities = {},
+  onChangeZoneQuantity,
   tablesOnly = false,
 }: {
   layout: VenueLayout;
   units?: Unit[];
   selected?: string[];
   onSelect?: (id: string) => void;
+  zones?: Zone[];
+  ticketTypes?: TicketType[];
+  pools?: Pool[];
+  selectedQuantities?: Record<string, number>;
+  onChangeZoneQuantity?: (ticketTypeId: string, nextQuantity: number) => void;
   tablesOnly?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -91,6 +101,8 @@ export function VenueView({
     Math.max(0.25, Number((fitScale + zoomOffset).toFixed(3))),
   );
   const inventory = new Map(units.map((unit) => [unit.id, unit]));
+  const zoneMap = new Map(zones.map((zone) => [zone.id, zone]));
+  const poolMap = new Map(pools.map((pool) => [pool.id, pool]));
 
   return (
     <div className="venue-view">
@@ -169,39 +181,79 @@ export function VenueView({
                 const objectType = object.type.toUpperCase();
                 const isUnitType =
                   objectType === "TABLE" || objectType === "SEAT";
+                const isZoneType = objectType === "ZONE";
+                const zone = isZoneType
+                  ? (object.zoneId ? zoneMap.get(object.zoneId) : undefined) ??
+                    zones.find(
+                      (z) =>
+                        z.name === object.name ||
+                        z.code === object.code ||
+                        `ZONE-${z.code}` === object.code,
+                    )
+                  : undefined;
+                const resolvedZoneId = object.zoneId || zone?.id;
+                const zoneTicket =
+                  isZoneType && resolvedZoneId
+                    ? ticketTypes.find(
+                        (t) =>
+                          t.zoneId === resolvedZoneId && t.active !== false,
+                      ) ?? zone?.ticketTypes?.[0]
+                    : undefined;
+                if (
+                  isZoneType &&
+                  zone?.sellingMode === "TABLE" &&
+                  !zoneTicket
+                ) {
+                  return null;
+                }
+                const zonePool = zoneTicket
+                  ? poolMap.get(zoneTicket.poolId) ??
+                    pools.find((p) => p.zoneId === resolvedZoneId) ??
+                    zone?.pools?.[0]
+                  : isZoneType && resolvedZoneId
+                    ? pools.find((p) => p.zoneId === resolvedZoneId) ??
+                      zone?.pools?.[0]
+                    : undefined;
+                const zoneAvailable =
+                  zonePool?.available ?? zone?.capacity ?? 0;
+                const zoneQty = zoneTicket
+                  ? selectedQuantities[zoneTicket.id] || 0
+                  : 0;
+                const zoneMax = Math.min(20, Math.max(0, zoneAvailable));
+                const isBookableZone = isZoneType && Boolean(zoneTicket);
+
                 const isCompactUnit = object.width < 52 || object.height < 52;
-                const rawStatus =
-                  unit?.status ||
-                  unit?.inventory?.status ||
-                  (isUnitType && units.length === 0 ? "AVAILABLE" : undefined);
+                const rawStatus = isBookableZone
+                  ? zoneAvailable > 0 || zoneQty > 0
+                    ? "AVAILABLE"
+                    : "SOLD"
+                  : unit?.status ||
+                    unit?.inventory?.status ||
+                    (isUnitType && units.length === 0 ? "AVAILABLE" : undefined);
                 const status =
                   rawStatus === "AVAILABLE"
                     ? "AVAILABLE"
                     : rawStatus
                       ? "SOLD"
                       : undefined;
-                const selectedUnit = object.unitId
-                  ? selected.includes(object.unitId)
-                  : false;
+                const selectedUnit = isBookableZone
+                  ? zoneQty > 0
+                  : object.unitId
+                    ? selected.includes(object.unitId)
+                    : false;
                 const style: CSSProperties & { "--obj-rot"?: string } = {
                   left: object.x,
                   top: object.y,
                   width: object.width,
                   height: object.height,
                   "--obj-rot": `${object.rotation || 0}deg`,
-                  ...(objectType === "ZONE" && object.color
-                    ? {
-                        background: `${object.color}33`,
-                        borderColor: object.color,
-                      }
-                    : {}),
                   borderRadius: isUnitType
                     ? isCompactUnit
                       ? 9
                       : 13
                     : object.shape === "circle"
                       ? "50%"
-                      : 8,
+                      : 13,
                 };
 
                 const unitContent = isUnitType ? (
@@ -227,9 +279,135 @@ export function VenueView({
                       </span>
                     ) : null}
                   </span>
+                ) : isZoneType ? (
+                  <span className="venue-zone-inner">
+                    <strong className="venue-zone-name">
+                      {zone?.name || object.name || object.label || object.code}
+                    </strong>
+                    {zoneTicket ? (
+                      <span className="venue-zone-price">
+                        {formatPriceShort(zoneTicket.priceSatang)} / ใบ
+                      </span>
+                    ) : null}
+                    {isBookableZone ? (
+                      <small className="venue-zone-stock">
+                        {zoneAvailable > 0
+                          ? `คงเหลือ ${zoneAvailable} ใบ`
+                          : "บัตรเต็มแล้ว"}
+                      </small>
+                    ) : null}
+                    {onChangeZoneQuantity && zoneTicket && zoneQty > 0 ? (
+                      <span
+                        className="venue-zone-stepper"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="venue-zone-step-btn"
+                          aria-label="ลดจำนวนบัตรโซน"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeZoneQuantity(
+                              zoneTicket.id,
+                              Math.max(0, zoneQty - 1),
+                            );
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onChangeZoneQuantity(
+                                zoneTicket.id,
+                                Math.max(0, zoneQty - 1),
+                              );
+                            }
+                          }}
+                        >
+                          −
+                        </span>
+                        <select
+                          className="venue-zone-select"
+                          aria-label="เลือกจำนวนบัตรในโซน"
+                          value={zoneQty}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onChangeZoneQuantity(
+                              zoneTicket.id,
+                              Number(e.target.value),
+                            );
+                          }}
+                        >
+                          <option value={0}>0 ใบ (ยกเลิก)</option>
+                          {Array.from(
+                            { length: Math.max(zoneMax, zoneQty) },
+                            (_, idx) => idx + 1,
+                          ).map((n) => (
+                            <option key={n} value={n} disabled={n > zoneMax}>
+                              เลือก {n} ใบ
+                            </option>
+                          ))}
+                        </select>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className={`venue-zone-step-btn ${zoneQty >= zoneMax ? "is-disabled" : ""}`}
+                          aria-label="เพิ่มจำนวนบัตรโซน"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (zoneQty < zoneMax) {
+                              onChangeZoneQuantity(zoneTicket.id, zoneQty + 1);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (
+                              (e.key === "Enter" || e.key === " ") &&
+                              zoneQty < zoneMax
+                            ) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onChangeZoneQuantity(zoneTicket.id, zoneQty + 1);
+                            }
+                          }}
+                        >
+                          +
+                        </span>
+                      </span>
+                    ) : onChangeZoneQuantity &&
+                      zoneTicket &&
+                      zoneAvailable > 0 ? (
+                      <span className="venue-zone-cta">คลิกเพื่อเลือกโซนนี้</span>
+                    ) : null}
+                  </span>
                 ) : (
                   object.name || object.label || object.code
                 );
+
+                if (isBookableZone && zoneTicket && onChangeZoneQuantity) {
+                  return (
+                    <button
+                      key={object.id}
+                      type="button"
+                      className="venue-object is-zone-tile"
+                      style={style}
+                      data-type="ZONE"
+                      data-status={status}
+                      data-selected={selectedUnit}
+                      disabled={status !== "AVAILABLE"}
+                      aria-label={`${object.name || zone?.name || zoneTicket.name} (${formatPriceShort(zoneTicket.priceSatang)} / ใบ) ${selectedUnit ? `เลือกแล้ว ${zoneQty} ใบ` : ""}`}
+                      aria-pressed={selectedUnit}
+                      onClick={() =>
+                        onChangeZoneQuantity(
+                          zoneTicket.id,
+                          zoneQty > 0 ? 0 : 1,
+                        )
+                      }
+                    >
+                      {unitContent}
+                    </button>
+                  );
+                }
 
                 return unit && onSelect ? (
                   <button
@@ -250,7 +428,7 @@ export function VenueView({
                 ) : (
                   <div
                     key={object.id}
-                    className={`venue-object ${isUnitType ? "is-unit-tile" : ""} ${isCompactUnit ? "is-compact-tile" : ""}`}
+                    className={`venue-object ${isUnitType ? "is-unit-tile" : ""} ${isZoneType ? "is-zone-tile" : ""} ${isCompactUnit ? "is-compact-tile" : ""}`}
                     style={style}
                     data-type={objectType}
                     data-status={status}

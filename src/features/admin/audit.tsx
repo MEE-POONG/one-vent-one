@@ -24,6 +24,8 @@ type Audit = {
 };
 const actionNames: Record<string, string> = {
   BOOKING_CREATED: "สร้างรายการจอง",
+  DEMO_PAYMENT_CONFIRMED: "ชำระเงินผ่าน QR Code สำเร็จ",
+  BOOKING_CONFIRMED: "ยืนยันการจอง",
   BOOKING_EXPIRED: "หมดเวลาชำระ",
   BOOKING_CANCELLED: "ยกเลิกรายการจอง",
   BOOKING_REJECTED: "ปฏิเสธรายการจอง",

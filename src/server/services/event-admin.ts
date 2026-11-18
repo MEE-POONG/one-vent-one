@@ -113,7 +113,7 @@ export async function adminEvent(id: string) {
   const rawEvent = await prisma.event.findUnique({
     where: { id },
     include: {
-      zones: { include: { pools: true } },
+      zones: { include: { pools: true, ticketTypes: true } },
       units: { include: { inventory: true } },
       ticketTypes: true,
       pools: true,
@@ -442,7 +442,25 @@ export async function createZone(
     key,
     input,
     async (tx) => {
-      const event = await configurable(tx, eventId);
+      const event = await tx.event.findUnique({ where: { id: eventId } });
+      invariant(
+        event && ["DRAFT", "PUBLISHED", "CLOSED"].includes(event.status),
+        "INVALID_TRANSITION",
+        "ไม่สามารถเพิ่มโซนในสถานะงานนี้ได้",
+      );
+      const fence = await tx.event.updateMany({
+        where: {
+          id: eventId,
+          version: event.version,
+          status: { in: ["DRAFT", "PUBLISHED", "CLOSED"] },
+        },
+        data: { version: { increment: 1 } },
+      });
+      invariant(
+        fence.count === 1,
+        "VERSION_CONFLICT",
+        "งานเปลี่ยนแปลง กรุณาโหลดใหม่",
+      );
       await assertCodeFree(tx, "zone", eventId, input.code);
       const { priceSatang, ...zoneFields } = input;
       const zone = await tx.zone.create({
@@ -483,7 +501,7 @@ export async function createZone(
       await audit(tx, actor.id, "ZONE_CREATE", "Zone", zone.id);
       return tx.zone.findUniqueOrThrow({
         where: { id: zone.id },
-        include: { pools: true },
+        include: { pools: true, ticketTypes: true },
       });
     },
   );
@@ -778,7 +796,7 @@ export async function createTicketType(
       invariant(
         pool?.zone.sellingMode === "GENERAL_ADMISSION",
         "VALIDATION_ERROR",
-        "ต้องเลือกโควตาของโซนบัตรยืนเดียวกัน",
+        "ต้องเลือกโควตาของโซนบัตรเข้างานเดียวกัน",
         422,
       );
       const type = await tx.ticketType.create({

@@ -6,7 +6,6 @@ import Image from "next/image";
 import { SiteHeader } from "@/components/site-header";
 import { getBusinessProfile } from "@/server/services/catalog";
 import { oneVentOneLogo } from "@/shared/images";
-import { publicSocialLinks } from "@/shared/contact";
 import "./globals.css";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -74,12 +73,6 @@ async function SiteContent({
                   {typeof contact?.address === "string" && contact.address ? (
                     <p>{contact.address}</p>
                   ) : null}
-                  {typeof contact?.phone === "string" && contact.phone ? (
-                    <p>โทร. {contact.phone}</p>
-                  ) : null}
-                  {typeof contact?.line === "string" && contact.line ? (
-                    <p>LINE: {contact.line}</p>
-                  ) : null}
                 </div>
               ) : (
                 <p className="footer-venue-info">
@@ -103,28 +96,6 @@ async function SiteContent({
                 <Link href="/faq">คำถามที่พบบ่อย (FAQ)</Link>
                 <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
                 <Link href="/terms">เงื่อนไขการใช้งาน</Link>
-              </div>
-            </div>
-
-            <div className="site-footer-col">
-              <h4 className="footer-title">บัญชีและช่องทางติดต่อ</h4>
-              <div className="footer-links">
-                {typeof contact?.email === "string" && contact.email ? (
-                  <a href={`mailto:${contact.email}`}>{contact.email}</a>
-                ) : null}
-                {publicSocialLinks(contact).map((channel) => (
-                  <a
-                    key={channel.key}
-                    href={channel.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {channel.label}
-                  </a>
-                ))}
-                <Link href="/login">เข้าสู่ระบบ</Link>
-                <Link href="/register">สมัครสมาชิก</Link>
-                <Link href="/forgot-password">กู้คืนรหัสผ่าน</Link>
               </div>
             </div>
           </div>

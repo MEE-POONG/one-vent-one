@@ -50,9 +50,11 @@ export interface Zone {
   name: string;
   color: string;
   sellingMode: string;
+  capacity?: number;
   units?: Unit[];
   ticketTypes?: TicketType[];
   pool?: Pool | null;
+  pools?: Pool[];
 }
 export interface LayoutObject {
   id: string;
@@ -122,6 +124,7 @@ export interface Availability {
   units: Unit[];
   pools: Pool[];
   ticketTypes: TicketType[];
+  zones?: Zone[];
   layout: VenueLayout | null;
 }
 export interface BookingItem {

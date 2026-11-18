@@ -49,15 +49,22 @@ export async function updateBusiness(
 ) {
   requireRoles(actor, "SUPER_ADMIN");
   return idempotent(actor.id, "business:update", key, input, async (tx) => {
-    const { bookingPolicy, ...fields } = input;
+    const { bookingPolicy: _ignoredPolicy, ...fields } = input;
+    void _ignoredPolicy;
+    const standardPolicy = {
+      holdMinutes: 5,
+      reviewHours: 24,
+      correctionHours: 24,
+      terms: "ชำระเงินผ่าน QR Code อัตโนมัติภายใน 5 นาที หลังสร้างรายการจอง",
+    };
     const profile = await tx.businessProfile.update({
       where: { key: "primary" },
       data: {
         ...fields,
-        bookingPolicy,
-        holdMinutes: bookingPolicy.holdMinutes,
-        reviewHours: bookingPolicy.reviewHours,
-        correctionHours: bookingPolicy.correctionHours,
+        bookingPolicy: standardPolicy,
+        holdMinutes: 5,
+        reviewHours: 24,
+        correctionHours: 24,
         version: { increment: 1 },
       },
     });

@@ -378,55 +378,100 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
         <div className="stack">
           {(event.zones ?? [])
             .filter((zone) => zone.sellingMode === "GENERAL_ADMISSION")
-            .map((zone) => (
-              <section className="panel stack" key={zone.id}>
-                <h2>{zone.name} · บัตรยืน</h2>
-                {event.pools
-                  .filter((pool) => pool.zoneId === zone.id)
-                  .map((pool) => (
-                    <form
-                      key={`${pool.id}-${pool.version}`}
-                      className="stack-sm"
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const data = new FormData(e.currentTarget);
-                        await submit(
-                          `pools/${pool.id}`,
-                          {
-                            version: pool.version,
-                            capacity: Number(data.get("capacity")),
-                            reason: "ปรับจำนวนบัตรของโซน",
-                          },
-                          "PATCH",
-                        );
-                      }}
-                    >
-                      <p className="muted">
-                        ว่าง {pool.available} · พักสิทธิ์ {pool.held} · รอตรวจ{" "}
-                        {pool.reviewReserved} · ขายแล้ว {pool.sold} · ระงับ{" "}
-                        {pool.blocked}
-                      </p>
-                      <Field
-                        label="จำนวนบัตรทั้งหมดในโซน"
-                        hint="ทุกราคาในโซนใช้โควตานี้ร่วมกัน ลดต่ำกว่าสิทธิ์ที่ใช้อยู่ไม่ได้"
-                      >
-                        <input
-                          name="capacity"
-                          type="number"
-                          required
-                          min={1}
-                          max={100000}
-                          defaultValue={pool.capacity}
-                          disabled={
-                            mutation.pending ||
-                            !["DRAFT", "PUBLISHED", "CLOSED"].includes(
-                              event.status,
-                            )
-                          }
-                        />
-                      </Field>
+            .map((zone) => {
+              const pool =
+                event.pools.find((p) => p.zoneId === zone.id) ??
+                zone.pools?.[0];
+              const ticket = event.ticketTypes?.find(
+                (t) => t.zoneId === zone.id,
+              );
+              const priceBaht = ticket ? ticket.priceSatang / 100 : 500;
+              const cap = pool ? pool.capacity : (zone.capacity ?? 100);
+              return (
+                <section className="panel stack" key={`${zone.id}-${event.version}`}>
+                  <div className="between" style={{ flexWrap: "wrap", gap: 10 }}>
+                    <div>
+                      <h2 style={{ margin: 0 }}>{zone.name} · โซนบัตรเข้างาน</h2>
+                      {pool ? (
+                        <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                          คงเหลือ {pool.available} ใบ · พักสิทธิ์ {pool.held} ใบ · ขายแล้ว{" "}
+                          {pool.sold} ใบ (จากทั้งหมด {pool.capacity} ใบ)
+                        </p>
+                      ) : null}
+                    </div>
+                    {isDraft ? (
                       <button
-                        className="button button-outline"
+                        type="button"
+                        className="button button-danger button-small"
+                        disabled={mutation.pending}
+                        onClick={() =>
+                          remove(`zones/${zone.id}`, `โซน ${zone.name}`)
+                        }
+                      >
+                        ลบโซนนี้
+                      </button>
+                    ) : null}
+                  </div>
+                  <form
+                    className="form-grid"
+                    style={{ alignItems: "end" }}
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const data = new FormData(e.currentTarget);
+                      const nextName = String(data.get("name") ?? "").trim();
+                      const nextPrice = Math.max(
+                        100,
+                        Math.round(Number(data.get("price")) * 100),
+                      );
+                      const nextCap = Math.max(
+                        1,
+                        Math.min(100000, Math.round(Number(data.get("capacity")) || cap)),
+                      );
+                      await submit(
+                        `zones/${zone.id}`,
+                        {
+                          name: nextName || zone.name,
+                          color: "#22c55e",
+                          priceSatang: nextPrice,
+                          capacity: nextCap,
+                          eventVersion: event.version,
+                        },
+                        "PATCH",
+                      );
+                    }}
+                  >
+                    <Field label="ชื่อโซนบัตรเข้างาน">
+                      <input
+                        name="name"
+                        required
+                        maxLength={100}
+                        defaultValue={zone.name}
+                      />
+                    </Field>
+                    <Field label="ราคาบัตร (บาท / ใบ)">
+                      <input
+                        name="price"
+                        type="number"
+                        min={1}
+                        max={1000000}
+                        step="0.01"
+                        required
+                        defaultValue={priceBaht}
+                      />
+                    </Field>
+                    <Field label="จำนวนบัตรทั้งหมดในโซน (ใบ)">
+                      <input
+                        name="capacity"
+                        type="number"
+                        required
+                        min={1}
+                        max={100000}
+                        defaultValue={cap}
+                      />
+                    </Field>
+                    <div className="actions">
+                      <button
+                        className="button"
                         disabled={
                           mutation.pending ||
                           !["DRAFT", "PUBLISHED", "CLOSED"].includes(
@@ -434,73 +479,20 @@ export function InventoryEditor({ eventId }: { eventId: string }) {
                           )
                         }
                       >
-                        บันทึกจำนวนบัตร
+                        <Save size={15} />
+                        บันทึกข้อมูลโซน
                       </button>
-                    </form>
-                  ))}
-                {event.ticketTypes
-                  ?.filter((ticket) => ticket.zoneId === zone.id)
-                  .map((ticket) => (
-                    <form
-                      key={`${ticket.id}-${event.version}`}
-                      className="form-grid"
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const data = new FormData(e.currentTarget);
-                        await submit(
-                          `ticket-types/${ticket.id}/price`,
-                          {
-                            eventVersion: event.version,
-                            name: data.get("name"),
-                            priceSatang: Math.round(
-                              Number(data.get("price")) * 100,
-                            ),
-                            reason: "ปรับราคาบัตรยืนสำหรับการจองใหม่",
-                          },
-                          "PATCH",
-                        );
-                      }}
-                    >
-                      <Field label="ชื่อประเภทบัตร">
-                        <input
-                          name="name"
-                          required
-                          maxLength={100}
-                          defaultValue={ticket.name}
-                        />
-                      </Field>
-                      <Field label="ราคาต่อคน (บาท)">
-                        <input
-                          name="price"
-                          type="number"
-                          min={0.01}
-                          max={1000000}
-                          step="0.01"
-                          required
-                          defaultValue={ticket.priceSatang / 100}
-                        />
-                      </Field>
-                      <button
-                        className="button button-outline"
-                        disabled={
-                          mutation.pending ||
-                          !["DRAFT", "PUBLISHED", "CLOSED"].includes(
-                            event.status,
-                          )
-                        }
-                      >
-                        บันทึกราคา
-                      </button>
-                    </form>
-                  ))}
-                <Link
-                  href={`/admin/events/${eventId}/layout`}
-                  className="text-link"
-                >
-                  ไปจัดตำแหน่งหรือเพิ่มโซนในผัง
-                </Link>
-              </section>
-            ))}
+                    </div>
+                  </form>
+                  <Link
+                    href={`/admin/events/${eventId}/layout`}
+                    className="text-link"
+                  >
+                    ไปจัดตำแหน่งหรือแก้ไขโซนในผัง
+                  </Link>
+                </section>
+              );
+            })}
           {event.status !== "DRAFT" ? (
             <div className="notice">
               เพิ่ม/ลบโต๊ะได้เฉพาะอีเวนท์ฉบับร่าง

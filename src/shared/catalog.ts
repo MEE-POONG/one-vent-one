@@ -80,7 +80,7 @@ export const zoneInput = z
   .refine(
     (v) => v.priceSatang === undefined || v.sellingMode === "GENERAL_ADMISSION",
     {
-      message: "กำหนดราคาต่อโซนได้เฉพาะบัตรยืน",
+      message: "กำหนดราคาต่อโซนได้เฉพาะโซนบัตรเข้างาน",
       path: ["priceSatang"],
     },
   );
@@ -173,7 +173,13 @@ export const structureDeleteInput = z.object({
 });
 export const zoneEditInput = z.object({
   name: z.string().trim().min(1).max(100),
-  color: z.string().regex(/^#[0-9a-f]{6}$/i),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional()
+    .default("#22c55e"),
+  priceSatang: price.optional(),
+  capacity: z.number().int().min(1).max(100000).optional(),
   eventVersion: z.number().int().min(0),
 });
 export const ticketTypeEditInput = z

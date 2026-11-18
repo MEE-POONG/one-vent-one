@@ -93,6 +93,7 @@ type MarqueeRect = {
 function Shape({
   object,
   unit,
+  zoneInfo,
   selected,
   isPrimarySelected,
   gridStep,
@@ -105,6 +106,7 @@ function Shape({
 }: {
   object: LayoutObject;
   unit?: Unit;
+  zoneInfo?: { priceSatang?: number; capacity?: number };
   selected: boolean;
   isPrimarySelected: boolean;
   gridStep: number;
@@ -125,18 +127,23 @@ function Shape({
     }
   }, [isPrimarySelected]);
 
-  const fill =
+  const isBookable =
     object.type === "zone"
-      ? (object.color || "#E11D48") + "55"
+      ? Boolean(object.zoneId)
+      : object.type === "table" || object.type === "seat"
+        ? Boolean(unit)
+        : false;
+
+  const fill =
+    object.type === "zone" || object.type === "table" || object.type === "seat"
+      ? isBookable
+        ? "#183c31"
+        : "#443414"
       : object.type === "stage"
         ? "#46323c"
-        : object.type === "table" || object.type === "seat"
-          ? unit
-            ? "#183c31"
-            : "#443414"
-          : object.type === "entrance"
-            ? "#253248"
-            : "#30303b";
+        : object.type === "entrance"
+          ? "#253248"
+          : "#30303b";
 
   const effectiveX =
     selected && dragOffset ? Math.max(0, object.x + dragOffset.dx) : object.x;
@@ -202,7 +209,7 @@ function Shape({
             radiusX={object.width / 2}
             radiusY={object.height / 2}
             fill={fill}
-            stroke={selected ? "#fb7185" : unit ? "#318669" : "#60606b"}
+            stroke={selected ? "#fb7185" : isBookable ? "#318669" : "#60606b"}
             strokeWidth={selected ? 2.5 : 1}
           />
         ) : (
@@ -210,7 +217,7 @@ function Shape({
             width={object.width}
             height={object.height}
             fill={fill}
-            stroke={selected ? "#fb7185" : unit ? "#318669" : "#60606b"}
+            stroke={selected ? "#fb7185" : isBookable ? "#318669" : "#60606b"}
             strokeWidth={selected ? 2.5 : 1}
             cornerRadius={6}
           />
@@ -219,7 +226,9 @@ function Shape({
           text={
             unit
               ? `${unit.code}\n${unit.admissionCount} ที่ · ฿${Math.round(unit.priceSatang / 100).toLocaleString("th-TH")}`
-              : object.name || object.code
+              : object.type === "zone" && zoneInfo?.priceSatang
+                ? `${object.name || object.code}\n฿${Math.round(zoneInfo.priceSatang / 100).toLocaleString("th-TH")} / ใบ${zoneInfo.capacity ? ` · ${zoneInfo.capacity} ใบ` : ""}`
+                : object.name || object.code
           }
           width={object.width}
           height={object.height}
@@ -227,7 +236,7 @@ function Shape({
           verticalAlign="middle"
           fontFamily="Noto Sans Thai Variable"
           fontSize={object.type === "stage" ? 20 : unit ? 10 : 13}
-          lineHeight={1.2}
+          lineHeight={1.25}
           fill="#f4f4f5"
           padding={3}
           listening={false}
@@ -316,6 +325,20 @@ export default function LayoutCanvas({
   const [unitDraftPrice, setUnitDraftPrice] = useState<Record<string, string>>(
     {},
   );
+  const [zoneDraftName, setZoneDraftName] = useState<Record<string, string>>(
+    {},
+  );
+  const [zoneDraftPrice, setZoneDraftPrice] = useState<Record<string, string>>(
+    {},
+  );
+  const [zoneDraftCapacity, setZoneDraftCapacity] = useState<
+    Record<string, string>
+  >({});
+  const [previewSelected, setPreviewSelected] = useState<string[]>([]);
+  const [previewQuantities, setPreviewQuantities] = useState<
+    Record<string, number>
+  >({});
+  const [localZones, setLocalZones] = useState<Zone[]>([]);
   const [batchSelectedSeats, setBatchSelectedSeats] = useState("4");
   const [batchSelectedPrice, setBatchSelectedPrice] = useState("2400");
   const [newTableSeats, setNewTableSeats] = useState(
@@ -1013,10 +1036,6 @@ export default function LayoutCanvas({
   }
 
   async function publish() {
-    if (dirty) {
-      mutation.setError(new Error("กรุณาบันทึกร่างก่อนเผยแพร่"));
-      return;
-    }
     if (
       !window.confirm(
         "เผยแพร่ผังเวอร์ชันใหม่สำหรับการจองใหม่? รายการจองเดิมยังใช้ผังเวอร์ชันเดิม",
@@ -1024,11 +1043,28 @@ export default function LayoutCanvas({
     )
       return;
     try {
+      let currentVersion = layout.version ?? layout.revision ?? 0;
+      if (dirty) {
+        const savedResult = await mutation.run<
+          VenueLayout & { warnings: string[] }
+        >(
+          `/api/admin/events/${eventId}/layout`,
+          {
+            version: currentVersion,
+            width: layout.width,
+            height: layout.height,
+            geometry: layout.geometry,
+          },
+          "PUT",
+        );
+        currentVersion =
+          savedResult.version ?? savedResult.revision ?? currentVersion;
+      }
       const result = await mutation.run<{
         draftVersion: number;
         warnings: string[];
       }>(`/api/admin/events/${eventId}/layout/publish`, {
-        version: layout.version ?? layout.revision ?? 0,
+        version: currentVersion,
       });
       const fresh = {
         ...layout,
@@ -1042,6 +1078,31 @@ export default function LayoutCanvas({
       await onEventReload?.();
     } catch {}
   }
+
+  const mergedZones = useMemo(() => {
+    const map = new Map<string, Zone>();
+    for (const z of event.zones ?? []) map.set(z.id, z);
+    for (const z of localZones) map.set(z.id, z);
+    return Array.from(map.values());
+  }, [event.zones, localZones]);
+
+  const mergedTicketTypes = useMemo(() => {
+    const map = new Map<string, NonNullable<EventData["ticketTypes"]>[number]>();
+    for (const t of event.ticketTypes ?? []) map.set(t.id, t);
+    for (const z of mergedZones) {
+      for (const t of z.ticketTypes ?? []) map.set(t.id, t);
+    }
+    return Array.from(map.values());
+  }, [event.ticketTypes, mergedZones]);
+
+  const mergedPools = useMemo(() => {
+    const map = new Map<string, NonNullable<EventData["pools"]>[number]>();
+    for (const p of event.pools ?? []) map.set(p.id, p);
+    for (const z of mergedZones) {
+      for (const p of z.pools ?? []) map.set(p.id, p);
+    }
+    return Array.from(map.values());
+  }, [event.pools, mergedZones]);
 
   const tableObjectsCount = layout.geometry.objects.filter(
     (o) => o.type === "table",
@@ -1099,10 +1160,10 @@ export default function LayoutCanvas({
           <button
             className="button button-small"
             onClick={publish}
-            disabled={dirty || mutation.pending}
+            disabled={mutation.pending}
           >
             <Upload size={15} />
-            เผยแพร่ผัง
+            {dirty ? "บันทึกและเผยแพร่ผัง" : "เผยแพร่ผัง"}
           </button>
         </div>
       </div>
@@ -1148,32 +1209,40 @@ export default function LayoutCanvas({
         </div>
       ) : null}
       {activeToolPanel === "zone" && !preview ? (
-        <div className="stack">
-          <div className="panel stack-sm">
-            <h3>โซนที่ยังไม่ได้วางในผัง</h3>
-            <div className="actions">
-              {event.zones
-                ?.filter(
-                  (zone) =>
-                    !layout.geometry.objects.some(
-                      (o) => o.type === "zone" && o.zoneId === zone.id,
-                    ),
-                )
-                .map((zone) => (
-                  <button
-                    type="button"
-                    key={zone.id}
-                    className="button button-outline button-small"
-                    onClick={() => placeZone(zone)}
-                  >
-                    {zone.name}
-                  </button>
-                ))}
-            </div>
-          </div>
+        <div className="stack" style={{ marginBottom: 18 }}>
+          {(() => {
+            const unplacedZones = (event.zones ?? []).filter(
+              (zone) =>
+                zone.sellingMode === "GENERAL_ADMISSION" &&
+                !layout.geometry.objects.some(
+                  (o) => o.type === "zone" && o.zoneId === zone.id,
+                ),
+            );
+            return unplacedZones.length > 0 ? (
+              <div className="panel stack-sm">
+                <h3>โซนบัตรเข้างานที่ยังไม่ได้วางในผัง</h3>
+                <div className="actions">
+                  {unplacedZones.map((zone) => (
+                    <button
+                      type="button"
+                      key={zone.id}
+                      className="button button-outline button-small"
+                      onClick={() => placeZone(zone)}
+                    >
+                      <Plus size={14} /> วางโซน {zone.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
           <ZoneForm
-            event={event}
+            event={{ ...event, zones: mergedZones }}
             onCreated={(zone) => {
+              setLocalZones((prev) => [
+                ...prev.filter((z) => z.id !== zone.id),
+                zone,
+              ]);
               placeZone(zone);
               setEventVersion((v) => v + 1);
               void onEventReload?.();
@@ -1182,18 +1251,39 @@ export default function LayoutCanvas({
         </div>
       ) : null}
       {preview ? (
-        <VenueView layout={layout} units={units} />
+        <VenueView
+          layout={layout}
+          units={units}
+          selected={previewSelected}
+          onSelect={(unitId) =>
+            setPreviewSelected((prev) =>
+              prev.includes(unitId)
+                ? prev.filter((id) => id !== unitId)
+                : [...prev, unitId],
+            )
+          }
+          zones={mergedZones}
+          ticketTypes={mergedTicketTypes}
+          pools={mergedPools}
+          selectedQuantities={previewQuantities}
+          onChangeZoneQuantity={(ticketTypeId, nextQty) =>
+            setPreviewQuantities((prev) => ({
+              ...prev,
+              [ticketTypeId]: nextQty,
+            }))
+          }
+        />
       ) : (
         <>
           <div className="editor-toolbar">
             <button
               type="button"
-              className="button button-outline button-small"
+              className={`button button-small ${activeToolPanel === "zone" ? "" : "button-outline"}`}
               onClick={() =>
                 setActiveToolPanel((v) => (v === "zone" ? null : "zone"))
               }
             >
-              <Plus size={14} /> เพิ่มโซน
+              <Plus size={14} /> เพิ่มโซนบัตรเข้างาน
             </button>
             <button
               type="button"
@@ -1390,7 +1480,7 @@ export default function LayoutCanvas({
                   </h3>
                   <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                     ระบุจำนวนที่นั่งและราคาของโต๊ะชุดนี้ แล้วเลือกตาราง{" "}
-                    <strong>แถว × โต๊ะต่อแถว</strong> เหมือนใน Microsoft Word
+                    <strong>แถว × โต๊ะต่อแถว</strong>{" "}
                     ระบบจะรันเลขโต๊ะต่อเนื่องและวางลงผังให้ทันที
                   </p>
                 </div>
@@ -1942,6 +2032,29 @@ export default function LayoutCanvas({
                         isSelected &&
                         groupDragOffset &&
                         groupDragOffset.anchorId !== object.id;
+                      const zoneObj =
+                        object.type === "zone" && object.zoneId
+                          ? mergedZones.find((z) => z.id === object.zoneId)
+                          : undefined;
+                      const zoneTicket =
+                        object.type === "zone" && object.zoneId
+                          ? mergedTicketTypes.find(
+                              (t) => t.zoneId === object.zoneId,
+                            ) ?? zoneObj?.ticketTypes?.[0]
+                          : undefined;
+                      if (
+                        object.type === "zone" &&
+                        zoneObj?.sellingMode === "TABLE" &&
+                        !zoneTicket
+                      ) {
+                        return null;
+                      }
+                      const zonePool =
+                        object.type === "zone" && object.zoneId
+                          ? mergedPools.find(
+                              (p) => p.zoneId === object.zoneId,
+                            ) ?? zoneObj?.pools?.[0]
+                          : undefined;
                       return (
                         <Shape
                           key={object.id}
@@ -1949,6 +2062,15 @@ export default function LayoutCanvas({
                           unit={
                             object.unitId
                               ? units.find((u) => u.id === object.unitId)
+                              : undefined
+                          }
+                          zoneInfo={
+                            object.type === "zone"
+                              ? {
+                                  priceSatang: zoneTicket?.priceSatang,
+                                  capacity:
+                                    zonePool?.capacity ?? zoneObj?.capacity,
+                                }
                               : undefined
                           }
                           selected={isSelected}
@@ -2507,6 +2629,144 @@ export default function LayoutCanvas({
                           return null;
                         })()}
                       </>
+                    ) : primarySelected.type === "zone" &&
+                      primarySelected.zoneId ? (
+                      (() => {
+                        const linkedZone = mergedZones.find(
+                          (z) => z.id === primarySelected.zoneId,
+                        );
+                        const linkedTicket =
+                          mergedTicketTypes.find(
+                            (t) => t.zoneId === primarySelected.zoneId,
+                          ) ?? linkedZone?.ticketTypes?.[0];
+                        const linkedPool =
+                          mergedPools.find(
+                            (p) => p.zoneId === primarySelected.zoneId,
+                          ) ?? linkedZone?.pools?.[0];
+                        if (!linkedZone) return null;
+                        const zId = linkedZone.id;
+                        const currentZName =
+                          zoneDraftName[zId] ??
+                          primarySelected.name ??
+                          linkedZone.name;
+                        const currentZPrice =
+                          zoneDraftPrice[zId] ??
+                          String((linkedTicket?.priceSatang ?? 50000) / 100);
+                        const currentZCap =
+                          zoneDraftCapacity[zId] ??
+                          String(
+                            linkedPool?.capacity ?? linkedZone.capacity ?? 100,
+                          );
+                        return (
+                          <div
+                            className="full panel stack-sm"
+                            style={{ padding: 14 }}
+                          >
+                            <strong style={{ fontSize: 13 }}>
+                              ตั้งค่าโซนบัตรเข้างาน ({linkedZone.code})
+                            </strong>
+                            <div className="form-grid">
+                              <div className="full">
+                                <Field label="ชื่อโซน">
+                                  <input
+                                    value={currentZName}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setZoneDraftName((prev) => ({
+                                        ...prev,
+                                        [zId]: val,
+                                      }));
+                                      changeObject(primarySelected.id, {
+                                        name: val,
+                                      });
+                                    }}
+                                  />
+                                </Field>
+                              </div>
+                              <Field label="ราคาบัตร (บาท / ใบ)">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step="0.01"
+                                  value={currentZPrice}
+                                  onChange={(e) =>
+                                    setZoneDraftPrice((prev) => ({
+                                      ...prev,
+                                      [zId]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </Field>
+                              <Field label="จำนวนบัตรในโซน (ใบ)">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={100000}
+                                  value={currentZCap}
+                                  onChange={(e) =>
+                                    setZoneDraftCapacity((prev) => ({
+                                      ...prev,
+                                      [zId]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </Field>
+                            </div>
+                            <ErrorNotice error={unitMutation.error} />
+                            <button
+                              type="button"
+                              className="button button-small"
+                              disabled={unitMutation.pending}
+                              onClick={async () => {
+                                const nextName =
+                                  currentZName.trim() || linkedZone.name;
+                                const priceSatang = Math.max(
+                                  100,
+                                  Math.round((Number(currentZPrice) || 500) * 100),
+                                );
+                                const capacity = Math.max(
+                                  1,
+                                  Math.min(
+                                    100000,
+                                    Math.round(Number(currentZCap) || 100),
+                                  ),
+                                );
+                                try {
+                                  const updatedZone =
+                                    await unitMutation.run<Zone>(
+                                      `/api/admin/events/${eventId}/zones/${zId}`,
+                                      {
+                                        name: nextName,
+                                        color: "#22c55e",
+                                        priceSatang,
+                                        capacity,
+                                        eventVersion,
+                                      },
+                                      "PATCH",
+                                    );
+                                  setLocalZones((prev) => [
+                                    ...prev.filter((z) => z.id !== zId),
+                                    updatedZone,
+                                  ]);
+                                  setEventVersion((v) => v + 1);
+                                  changeObject(primarySelected.id, {
+                                    name: nextName,
+                                  });
+                                  setMessage(
+                                    `บันทึกโซน “${nextName}” (ราคา ฿${Math.round(priceSatang / 100).toLocaleString("th-TH")}/ใบ · จำนวน ${capacity} ใบ) เรียบร้อยแล้ว`,
+                                  );
+                                  await onEventReload?.();
+                                } catch {}
+                              }}
+                            >
+                              <Save size={14} />
+                              {unitMutation.pending
+                                ? "กำลังบันทึกโซน..."
+                                : "บันทึกข้อมูลโซน"}
+                            </button>
+                          </div>
+                        );
+                      })()
                     ) : null}
                     <Field label="รูปทรง">
                       <select

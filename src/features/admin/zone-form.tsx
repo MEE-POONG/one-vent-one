@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { useMutation } from "@/lib/client-api";
 import type { EventData, Zone } from "@/lib/client-types";
 import { ErrorNotice, Field } from "@/components/ui";
@@ -12,7 +13,17 @@ export function ZoneForm({
   onCreated: (zone: Zone) => void;
 }) {
   const mutation = useMutation();
-  const [mode, setMode] = useState("GENERAL_ADMISSION");
+  const nextDefaultCode = useMemo(() => {
+    const existing = new Set((event.zones ?? []).map((z) => z.code.toUpperCase()));
+    for (let i = 1; i <= 999; i++) {
+      const candidate = `ZONE-${String(i).padStart(2, "0")}`;
+      if (!existing.has(candidate)) return candidate;
+    }
+    return `ZONE-${(event.zones?.length ?? 0) + 1}`;
+  }, [event.zones]);
+
+  const [customCode, setCustomCode] = useState("");
+
   return (
     <form
       className="panel stack"
@@ -21,94 +32,86 @@ export function ZoneForm({
         if (mutation.pending) return;
         const form = e.currentTarget;
         const data = new FormData(form);
+        const codeValue = (customCode.trim() || nextDefaultCode).toUpperCase();
         try {
           const zone = await mutation.run<Zone>(
             `/api/admin/events/${event.id}/zones`,
             {
-              code: data.get("code"),
-              name: data.get("name"),
-              sellingMode: mode,
-              color: data.get("color"),
-              ...(mode === "GENERAL_ADMISSION"
-                ? {
-                    capacity: Number(data.get("capacity")),
-                    priceSatang: Math.round(Number(data.get("price")) * 100),
-                  }
-                : {}),
+              code: codeValue,
+              name: String(data.get("name") ?? "").trim(),
+              sellingMode: "GENERAL_ADMISSION",
+              color: "#22c55e",
+              capacity: Number(data.get("capacity")),
+              priceSatang: Math.round(Number(data.get("price")) * 100),
             },
           );
           form.reset();
+          setCustomCode("");
           onCreated(zone);
         } catch {}
       }}
     >
-      <h3>เพิ่มโซนในผัง</h3>
+      <h3>เพิ่มโซนบัตรเข้างานลงในผัง</h3>
       <p className="muted">
-        บัตรยืนขายตามจำนวนคนในโซน ไม่ระบุที่นั่ง
-        สร้างโควตาและราคาพร้อมกันเมื่อบันทึก
+        สำหรับกรณีขายเป็นบัตรเข้างานตามโซน กำหนดชื่อโซน ราคาต่อใบ และจำนวนบัตร แล้วกดวางลงในผังเพื่อให้ลูกค้าคลิกเลือกโซนและระบุจำนวนบัตร (สูงสุด 20 ใบ) ได้เหมือนโต๊ะ
       </p>
       <fieldset
         disabled={event.status !== "DRAFT" || mutation.pending}
         className="form-grid"
       >
-        <Field label="รูปแบบการจำหน่าย">
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="GENERAL_ADMISSION">บัตรยืน / เข้าชมตามโซน</option>
-            <option value="TABLE">โต๊ะ</option>
-            <option value="SEAT">ที่นั่ง</option>
-          </select>
-        </Field>
-        <Field label="รหัสโซน">
-          <input
-            name="code"
-            required
-            maxLength={30}
-            pattern="[A-Za-z0-9_-]+"
-            placeholder="เช่น STANDING-A"
-          />
-        </Field>
-        <Field label="ชื่อโซน">
+        <Field label="ชื่อโซนที่แสดงบนผัง">
           <input
             name="name"
             required
             maxLength={100}
-            placeholder="เช่น โซนยืนหน้าเวที"
+            placeholder="เช่น โซนหน้าเวที / บัตรเข้างานทั่วไป"
           />
         </Field>
-        <Field label="สีโซน">
-          <input name="color" type="color" defaultValue="#E11D48" />
+        <Field
+          label="รหัสโซน (เว้นว่างเพื่อรันอัตโนมัติ)"
+          hint={`ค่าอัตโนมัติ: ${nextDefaultCode}`}
+        >
+          <input
+            name="code"
+            value={customCode}
+            onChange={(e) => setCustomCode(e.target.value)}
+            maxLength={30}
+            pattern="[A-Za-z0-9_-]+"
+            placeholder={nextDefaultCode}
+          />
         </Field>
-        {mode === "GENERAL_ADMISSION" ? (
-          <>
-            <Field label="จำนวนบัตรในโซน (คน)">
-              <input
-                name="capacity"
-                type="number"
-                required
-                min={1}
-                max={100000}
-                defaultValue={100}
-              />
-            </Field>
-            <Field label="ราคาต่อคน (บาท)">
-              <input
-                name="price"
-                type="number"
-                required
-                min={0.01}
-                max={1000000}
-                step="0.01"
-                defaultValue={500}
-              />
-            </Field>
-          </>
-        ) : null}
-        <button className="button" disabled={mutation.pending}>
-          สร้างโซนและวางในผัง
-        </button>
+        <Field label="ราคาบัตร (บาท / ใบ)">
+          <input
+            name="price"
+            type="number"
+            required
+            min={1}
+            max={1000000}
+            step="0.01"
+            defaultValue={500}
+          />
+        </Field>
+        <Field label="จำนวนบัตรที่เปิดขายในโซน (ใบ)">
+          <input
+            name="capacity"
+            type="number"
+            required
+            min={1}
+            max={100000}
+            defaultValue={100}
+          />
+        </Field>
+        <div className="actions full">
+          <button className="button" disabled={mutation.pending}>
+            <Plus size={15} />
+            สร้างโซนและวางลงในผัง
+          </button>
+        </div>
       </fieldset>
       {event.status !== "DRAFT" ? (
-        <p className="muted">เพิ่มโซนได้เฉพาะอีเวนต์ฉบับร่าง</p>
+        <p className="muted">
+          เพิ่มโซนใหม่ได้เมื่ออีเวนต์อยู่ในสถานะฉบับร่าง (ปิดการขายแล้วกด “กลับเป็นฉบับร่าง” ในหน้ารายละเอียดงาน)
+        </p>
       ) : null}
       <ErrorNotice error={mutation.error} />
     </form>

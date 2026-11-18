@@ -152,7 +152,7 @@ export function SiteHeader({
           {searchOpen ? <X size={19} /> : <Search size={19} />}
         </button>
         {!session ? (
-          <Link href="/login" className="button button-outline header-auth">
+          <Link href="/login" className="button header-auth header-login-btn">
             <UserRound size={17} />
             <span>เข้าสู่ระบบ</span>
           </Link>

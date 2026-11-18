@@ -13,17 +13,14 @@ export function ContactSettings() {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
   const fields = [
-    { key: "phone", label: "โทรศัพท์", type: "tel" },
-    { key: "line", label: "LINE ID", type: "text" },
-    { key: "email", label: "อีเมลติดต่อ", type: "email" },
     { key: "address", label: "ที่อยู่", type: "text" },
     ...socialChannels.map((c) => ({ ...c, type: "url" })),
   ];
   return (
     <>
       <PageHeading
-        title="โซเชียลมีเดียและช่องทางติดต่อ"
-        description="ข้อมูลจะแสดงที่ท้ายเว็บไซต์และหน้าข้อกำหนด เว้นว่างเพื่อซ่อนช่องทาง"
+        title="โซเชียลมีเดียและที่อยู่ร้าน"
+        description="จัดการลิงก์โซเชียลมีเดียและที่อยู่ของร้าน"
       />
       <ErrorNotice
         error={resource.error || mutation.error}

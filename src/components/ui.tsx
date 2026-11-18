@@ -62,7 +62,7 @@ const statuses: Record<string, string> = {
 };
 export const statusText = (status: string) => statuses[status] || status;
 export const modeText = (mode: string) =>
-  ({ TABLE: "โต๊ะ", SEAT: "ที่นั่ง", GENERAL_ADMISSION: "บัตรยืน / โซน" })[
+  ({ TABLE: "โต๊ะ", SEAT: "ที่นั่ง", GENERAL_ADMISSION: "บัตรเข้างาน / โซน" })[
     mode
   ] || mode;
 export function Status({ value }: { value: string }) {

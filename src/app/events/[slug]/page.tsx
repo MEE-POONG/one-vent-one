@@ -10,11 +10,11 @@ import {
   ShieldCheck,
   Ticket,
 } from "lucide-react";
-import { getBusinessProfile, getEventBySlug } from "@/server/services/catalog";
-import { JsonFacts, Status } from "@/components/ui";
+import { getEventBySlug } from "@/server/services/catalog";
+import { Status } from "@/components/ui";
 import { EventCountdown } from "@/features/events/event-countdown";
 import { dateTime, money } from "@/lib/format";
-import type { Business, EventData } from "@/lib/client-types";
+import type { EventData } from "@/lib/client-types";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -26,14 +26,9 @@ export default async function EventPage({
 }) {
   const { slug } = await params;
   let event: EventData;
-  let business: Business | null = null;
   try {
-    const [e, b] = await Promise.all([
-      getEventBySlug(slug),
-      getBusinessProfile(),
-    ]);
+    const e = await getEventBySlug(slug);
     event = JSON.parse(JSON.stringify(e));
-    business = JSON.parse(JSON.stringify(b));
   } catch (error) {
     if ((error as { code?: string }).code === "NOT_FOUND") notFound();
     throw error;
@@ -99,17 +94,14 @@ export default async function EventPage({
                 <span /> BOOKING POLICY
               </div>
               <h2 style={{ marginTop: 10, marginBottom: 16 }}>
-                ข้อกำหนดก่อนจองโต๊ะ
+                ข้อกำหนดการจอง
               </h2>
-              <JsonFacts value={business?.bookingPolicy} />
-              <div className="notice" style={{ marginTop: 16 }}>
+              <div className="notice">
                 <ShieldCheck size={19} style={{ color: "#d71920" }} />
                 <p>
-                  เมื่อสร้างการจองโต๊ะ คุณมีเวลา{" "}
-                  {business?.holdMinutes && business.holdMinutes !== 15
-                    ? business.holdMinutes
-                    : 5}{" "}
-                  นาทีเพื่อชำระเงินผ่าน QR Code ให้เสร็จสิ้นภายในเวลาที่กำหนด
+                  ชำระเงินผ่าน QR Code อัตโนมัติภายใน <strong>5 นาที</strong>{" "}
+                  หลังจากยืนยันรายการจอง เมื่อชำระเงินสำเร็จระบบจะยืนยันสิทธิ์และออกบัตรเข้างานดิจิทัลให้ทันที
+                  หากไม่ชำระเงินภายใน 5 นาที รายการจองจะหมดอายุและคืนสิทธิ์กลับสู่ผังอัตโนมัติ
                 </p>
               </div>
             </section>
@@ -120,16 +112,22 @@ export default async function EventPage({
 
             <div className="panel customer-sticky-card">
               <div className="section-kicker">
-                <span /> TABLE PRICING
+                <span /> TICKET & TABLE PRICING
               </div>
               <h2 style={{ marginTop: 10, marginBottom: 18 }}>
-                ราคาชุดโต๊ะในงาน
+                ราคาบัตรและชุดโต๊ะในงาน
               </h2>
 
               <div className="zone-tier-list">
                 {(() => {
                   const allUnits = (event.zones ?? []).flatMap(
                     (zone) => zone.units || [],
+                  );
+                  const allTicketTypes = (event.zones ?? []).flatMap((zone) =>
+                    (zone.ticketTypes || []).map((tt) => ({
+                      ...tt,
+                      zoneName: zone.name,
+                    })),
                   );
                   const tierMap = new Map<
                     string,
@@ -153,52 +151,67 @@ export default async function EventPage({
                     (a, b) => a.priceSatang - b.priceSatang || a.seats - b.seats,
                   );
 
-                  if (tiers.length === 0) {
+                  if (tiers.length === 0 && allTicketTypes.length === 0) {
                     return (
                       <div className="zone-tier-card">
                         <div>
-                          <strong>จองเป็นรายโต๊ะ (Table Only)</strong>
-                          <small>เลือกโต๊ะว่างจากผังอีเวนต์ได้โดยตรง</small>
+                          <strong>เลือกจากผังอีเวนต์</strong>
+                          <small>เลือกโต๊ะหรือโซนที่ต้องการได้จากหน้าผังงาน</small>
                         </div>
                         <strong className="zone-tier-price">—</strong>
                       </div>
                     );
                   }
 
-                  return tiers.map((tier) => {
-                    const sortedCodes = [...tier.codes].sort((a, b) =>
-                      a.localeCompare(b, undefined, { numeric: true }),
-                    );
-                    const codeRange =
-                      sortedCodes.length > 1
-                        ? `${sortedCodes[0]}–${sortedCodes[sortedCodes.length - 1]}`
-                        : sortedCodes[0];
-                    return (
-                      <div
-                        key={`${tier.seats}-${tier.priceSatang}`}
-                        className="zone-tier-card"
-                      >
-                        <div>
-                          <strong>โต๊ะสำหรับ {tier.seats} ที่นั่ง</strong>
-                          <small>
-                            จองเป็นรายโต๊ะ · ทั้งหมด {tier.codes.length} โต๊ะ ({codeRange})
-                          </small>
+                  return (
+                    <>
+                      {tiers.map((tier) => {
+                        const sortedCodes = [...tier.codes].sort((a, b) =>
+                          a.localeCompare(b, undefined, { numeric: true }),
+                        );
+                        const codeRange =
+                          sortedCodes.length > 1
+                            ? `${sortedCodes[0]}–${sortedCodes[sortedCodes.length - 1]}`
+                            : sortedCodes[0];
+                        return (
+                          <div
+                            key={`table-${tier.seats}-${tier.priceSatang}`}
+                            className="zone-tier-card"
+                          >
+                            <div>
+                              <strong>โต๊ะสำหรับ {tier.seats} ที่นั่ง</strong>
+                              <small>
+                                จองเป็นรายโต๊ะ · ทั้งหมด {tier.codes.length} โต๊ะ ({codeRange})
+                              </small>
+                            </div>
+                            <strong className="zone-tier-price">
+                              {money(tier.priceSatang)}
+                            </strong>
+                          </div>
+                        );
+                      })}
+                      {allTicketTypes.map((tt) => (
+                        <div key={`zone-${tt.id}`} className="zone-tier-card">
+                          <div>
+                            <strong>{tt.zoneName || tt.name}</strong>
+                            <small>บัตรเข้างานตามโซน · ราคาต่อ 1 สิทธิ์</small>
+                          </div>
+                          <strong className="zone-tier-price">
+                            {money(tt.priceSatang)}
+                          </strong>
                         </div>
-                        <strong className="zone-tier-price">
-                          {money(tier.priceSatang)}
-                        </strong>
-                      </div>
-                    );
-                  });
+                      ))}
+                    </>
+                  );
                 })()}
               </div>
 
               <div className="sale-window-box">
                 <Clock3 size={16} />
                 <div>
-                  <span>ช่วงเวลาเปิดจองโต๊ะ</span>
+                  <span>ช่วงเวลาเปิดจำหน่าย</span>
                   <small>
-                    เปิดจอง {dateTime(event.saleStartsAt)}
+                    เปิดจำหน่าย {dateTime(event.saleStartsAt)}
                     <br />
                     ถึง {dateTime(event.saleEndsAt)}
                   </small>
@@ -211,7 +224,7 @@ export default async function EventPage({
                   href={`/events/${event.slug}/booking`}
                 >
                   <Ticket size={18} />
-                  เลือกโต๊ะ <ArrowRight size={18} />
+                  เลือกโต๊ะ / โซน <ArrowRight size={18} />
                 </Link>
               ) : (
                 <p className="notice">ขณะนี้อีเวนต์ไม่เปิดรับการจอง</p>

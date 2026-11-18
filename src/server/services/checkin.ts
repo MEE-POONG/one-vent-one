@@ -5,10 +5,9 @@ import { requireRoles } from "@/server/permissions";
 import type { CheckInInput } from "@/shared/booking";
 import { idempotent } from "./idempotency";
 import {
-  buildTicketCode,
-  extractUnitCodeFromSnapshot,
   hashTicketToken,
   parseTicketLookupInput,
+  ticketCodeFor,
 } from "./ticket";
 
 export async function checkIn(actor: Actor, input: CheckInInput, key: string) {
@@ -47,18 +46,18 @@ export async function checkIn(actor: Actor, input: CheckInInput, key: string) {
         });
       } else {
         const eventTickets = await tx.ticket.findMany({
-          where: { eventId: input.eventId, admissionSequence: 1 },
+          where: { eventId: input.eventId },
           include: { booking: true, bookingItem: true },
         });
         ticket =
-          eventTickets.find((t) => {
-            const uCode = extractUnitCodeFromSnapshot(t.bookingItem.snapshot);
-            return buildTicketCode(uCode, t.tokenHash) === parsed.value;
-          }) ?? null;
+          eventTickets.find((t) => ticketCodeFor(t) === parsed.value) ?? null;
       }
 
+      const isTable = ticket?.bookingItem.sellingMode === "TABLE";
       const maxAdmissions = ticket
-        ? Math.max(1, ticket.bookingItem.admissionCount)
+        ? isTable
+          ? Math.max(1, ticket.bookingItem.admissionCount)
+          : 1
         : 1;
       const acceptedCount = ticket
         ? await tx.checkInLog.count({
@@ -84,7 +83,7 @@ export async function checkIn(actor: Actor, input: CheckInInput, key: string) {
         message = "บัตรนี้ถูกยกเลิกหรือไม่สามารถใช้กับงานนี้ได้";
       } else if (ticket.status === "USED" || acceptedCount >= maxAdmissions) {
         errorCode = "TICKET_ALREADY_USED";
-        message = `บัตรโต๊ะนี้ใช้เข้างานครบทั้ง ${maxAdmissions} ที่นั่งแล้ว (${acceptedCount}/${maxAdmissions}) ล่าสุดเมื่อ ${
+        message = `บัตรนี้ใช้สิทธิ์เข้างานครบแล้ว (${acceptedCount}/${maxAdmissions}) ล่าสุดเมื่อ ${
           ticket.usedAt
             ? new Intl.DateTimeFormat("th-TH", {
                 dateStyle: "medium",
@@ -163,18 +162,23 @@ export async function checkIn(actor: Actor, input: CheckInInput, key: string) {
         string,
         unknown
       >;
-      const unitCode = extractUnitCodeFromSnapshot(snap);
-      const ticketCode = buildTicketCode(unitCode, ticket.tokenHash);
+      const ticketCode = ticketCodeFor(ticket);
+      const baseLabel = String(
+        snap.unitName ||
+          snap.ticketTypeName ||
+          snap.zoneName ||
+          snap.unitCode ||
+          "บัตรเข้างาน",
+      );
+      const itemLabel =
+        !isTable && ticket.bookingItem.admissionCount > 1
+          ? `${baseLabel} (ใบที่ ${ticket.admissionSequence}/${ticket.bookingItem.admissionCount})`
+          : baseLabel;
 
       return {
         ticketId: ticket.id,
         ticketCode,
-        itemLabel: String(
-          snap.unitName ||
-            snap.ticketTypeName ||
-            snap.unitCode ||
-            "บัตรเข้างาน",
-        ),
+        itemLabel,
         status: nextStatus as "ACTIVE" | "USED",
         checkedInCount: newCheckedInCount,
         totalAdmissions: maxAdmissions,

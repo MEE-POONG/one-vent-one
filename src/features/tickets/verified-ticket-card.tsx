@@ -174,7 +174,7 @@ function TicketCard3DFaces({
                 {isTable
                   ? "บัตรประจำโต๊ะ"
                   : data.sellingMode === "GENERAL_ADMISSION"
-                    ? "บัตรยืน / ไม่ระบุที่นั่ง"
+                    ? "บัตรเข้างานตามโซน"
                     : "บัตรที่นั่ง"}
               </span>
             </div>

@@ -290,7 +290,7 @@ test(
         assert.equal(results[0].payments.length, 0);
         assert.equal(
           (await getTickets(customer, booking.id)).tickets.length,
-          2,
+          3,
         );
         assert.equal(
           (
@@ -984,7 +984,7 @@ test(
         assert.equal(pool.held, 0);
         booking = await approve(booking);
         const tickets = (await getTickets(customer, booking.id)).tickets;
-        assert.equal(tickets.length, 3);
+        assert.equal(tickets.length, 4);
         pool = await prisma.capacityPool.findUniqueOrThrow({
           where: { id: f.pool.id },
         });
