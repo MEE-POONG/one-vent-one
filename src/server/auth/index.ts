@@ -9,6 +9,7 @@ import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { trustedOrigins } from "@/server/origins";
 import { hasRole } from "@/server/permissions";
+import { googleProvider } from "./google";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000";
 const createAdapter = prismaAdapter(prisma, { provider: "mongodb" });
@@ -43,6 +44,7 @@ export const auth = betterAuth({
     };
   },
   trustedOrigins,
+  socialProviders: googleProvider ? { google: googleProvider } : {},
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,

@@ -35,6 +35,26 @@ npm run db:seed
 
 `npm run dev` สร้าง Prisma client ใหม่ให้อัตโนมัติก่อนเปิดทุกครั้ง หลัง `git pull` จึงไม่ต้องรัน generate เอง ถ้าแก้ `prisma/schema.prisma` ระหว่างที่ dev เปิดอยู่ ให้รัน `npm run db:generate` (ใช้ได้แม้ dev เปิดอยู่ ไม่ขึ้น EPERM แล้ว) จากนั้นปิดและเปิด `npm run dev` ใหม่ เพราะ server ที่รันอยู่ยังจำ client เดิมไว้
 
+## เข้าสู่ระบบด้วย Google
+
+หน้า `/login` และ `/register` รองรับ Google ผ่าน Better Auth โดยใช้บัญชีและสิทธิ์ชุดเดียวกับการเข้าสู่ระบบด้วยอีเมล บัญชีใหม่ได้รับสิทธิ์ CUSTOMER และกลับหน้าที่กำลังจองได้ ส่วนเจ้าหน้าที่เข้าสู่หน้าจัดการตามสิทธิ์เดิม
+
+1. เปิด [Google Cloud Console](https://console.cloud.google.com/) ตั้งค่า Google Auth Platform (Branding, Audience และ Data Access) แล้วสร้าง OAuth client ชนิด **Web application**
+2. เพิ่ม Authorized redirect URI ให้ตรงกับ `BETTER_AUTH_URL` เช่น `http://127.0.0.1:3000/api/auth/callback/google` สำหรับเครื่องพัฒนา หรือ `https://your-domain.com/api/auth/callback/google` สำหรับเว็บจริง
+3. เพิ่มค่าใน `.env` (ห้ามนำ Client Secret ขึ้น Git หรือใช้ชื่อ `NEXT_PUBLIC_`):
+
+```dotenv
+BETTER_AUTH_URL="http://127.0.0.1:3000"
+GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+4. ปิดแล้วเปิด `npm run dev` ใหม่ จากนั้นกด “เข้าสู่ระบบด้วย Google” หากแอป Google ยังอยู่ในสถานะ Testing ให้เพิ่มอีเมลผู้ทดลองใน Test users ด้วย
+
+ระหว่างใช้ Google ให้เปิดเว็บจากที่อยู่เดียวกับ `BETTER_AUTH_URL` ตลอดขั้นตอน เพื่อให้ cookie ตรวจสอบ OAuth และ session อยู่บน host เดียวกัน (`localhost` กับ `127.0.0.1` เป็นคนละ host) ต้องตั้งค่า redirect URI และ environment บน production แยกด้วย ปุ่ม Google จะยังปิดใช้งานจนกว่าจะตั้ง Client ID และ Client Secret ครบ ระบบไม่ขอสิทธิ์ Drive หรือ Gmail และใช้ session เดิมของ Better Auth ดูรายละเอียดที่ [คู่มือ Google ของ Better Auth](https://better-auth.com/docs/authentication/google)
+
+บัญชีอีเมลเดิมที่ยังไม่ยืนยันอีเมลจะไม่ถูกผูกกับ Google อัตโนมัติ ผู้ใช้จะได้รับข้อความให้เข้าสู่ระบบด้วยรหัสผ่านเดิม เพื่อคงการตรวจสอบเจ้าของบัญชีตามค่าเริ่มต้นของ Better Auth หากอีเมลทั้งสองฝั่งยืนยันแล้ว การผูกบัญชีจะคง user ID การจอง และสิทธิ์เดิม
+
 ## สร้างผู้ดูแลครั้งแรก
 
 เปิดระบบไว้ (`npm run dev` หรือเปิดเฉพาะฐานข้อมูลด้วย `npm run db:dev`) แล้วรันคำสั่งในอีก terminal ระบบจะถามอีเมล ชื่อ และรหัสผ่าน (อย่างน้อย 8 ตัวอักษร ไม่แสดงบนจอ) ไม่ใช้บัญชีหรือรหัสผ่าน production

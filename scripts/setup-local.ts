@@ -14,6 +14,8 @@ async function main() {
       'DATABASE_URL="mongodb://127.0.0.1:27018/oneventone?replicaSet=rs0&directConnection=true"',
       'BETTER_AUTH_URL="http://127.0.0.1:3000"',
       `BETTER_AUTH_SECRET="${secret()}"`,
+      'GOOGLE_CLIENT_ID=""',
+      'GOOGLE_CLIENT_SECRET=""',
       `TICKET_ENCRYPTION_KEY="${secret()}"`,
       `JOB_SECRET="${secret()}"`,
       'STORAGE_DIRECTORY=".local/uploads"',
