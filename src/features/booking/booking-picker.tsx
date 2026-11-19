@@ -556,28 +556,51 @@ export function BookingPicker({ slug }: { slug: string }) {
               </div>
               <strong>{money(estimatedTotal)}</strong>
             </div>
-            <label className="check-label">
-              <input
-                type="checkbox"
-                checked={accepted}
-                onChange={(e) => setAccepted(e.target.checked)}
-              />
-              <span>
-                ยอมรับเงื่อนไขการจอง และชำระเงินผ่าน QR Code ภายใน 5 นาที
-              </span>
-            </label>
-            <ErrorNotice error={error} />
-            <button
-              className="mongkol-button button-wide"
-              style={{ marginTop: 16 }}
-              disabled={
-                !accepted || admissions === 0 || pending || sessionPending
+            {(() => {
+              const nowMs = data?.serverNow ? Date.parse(data.serverNow) : NaN;
+              const endMs = event.endsAt ? Date.parse(event.endsAt) : NaN;
+              const isEnded =
+                event.status === "COMPLETED" ||
+                (!Number.isNaN(nowMs) &&
+                  !Number.isNaN(endMs) &&
+                  endMs <= nowMs);
+              const canBook = event.status === "PUBLISHED" && !isEnded;
+              if (!canBook) {
+                return (
+                  <p className="notice" style={{ marginTop: 18 }}>
+                    {isEnded
+                      ? "อีเวนต์นี้จบแล้ว ปิดการจำหน่ายบัตรและไม่เปิดรับการจอง"
+                      : "ขณะนี้อีเวนต์ไม่เปิดรับการจอง"}
+                  </p>
+                );
               }
-              onClick={book}
-            >
-              {pending ? "กำลังสร้างการจอง" : "ยืนยันและไปชำระเงิน"}
-              <ArrowRight size={17} />
-            </button>
+              return (
+                <>
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      checked={accepted}
+                      onChange={(e) => setAccepted(e.target.checked)}
+                    />
+                    <span>
+                      ยอมรับเงื่อนไขการจอง และชำระเงินผ่าน QR Code ภายใน 5 นาที
+                    </span>
+                  </label>
+                  <ErrorNotice error={error} />
+                  <button
+                    className="mongkol-button button-wide"
+                    style={{ marginTop: 16 }}
+                    disabled={
+                      !accepted || admissions === 0 || pending || sessionPending
+                    }
+                    onClick={book}
+                  >
+                    {pending ? "กำลังสร้างการจอง" : "ยืนยันและไปชำระเงิน"}
+                    <ArrowRight size={17} />
+                  </button>
+                </>
+              );
+            })()}
             {error && !(error instanceof ApiError) ? (
               <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
                 การเชื่อมต่ออาจขัดข้อง

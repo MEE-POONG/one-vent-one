@@ -23,14 +23,6 @@ type Props = {
   venueName: string;
   contact: Record<string, unknown>;
 };
-const examples = [
-  "ROOFTOP RHYTHM",
-  "SIP & SOUL",
-  "MIDNIGHT GROOVE",
-  "RED ROOM NIGHTS",
-  "LIVE SESSION",
-  "LAST CALL",
-];
 
 type HeroSlideItem = {
   id: string;
@@ -48,15 +40,39 @@ function Tilt({ children }: { children: React.ReactNode }) {
   return <div className="mongkol-event">{children}</div>;
 }
 
+function isUpcomingActiveEvent(event: EventData, nowMs: number) {
+  if (event.status !== "PUBLISHED") return false;
+  if (!event.endsAt) return true;
+  const endMs = Date.parse(event.endsAt);
+  return Number.isNaN(endMs) || endMs > nowMs;
+}
+
 export function Home({ events, venueName, contact }: Props) {
   const [slide, setSlide] = useState(0);
   const [autoplay, setAutoplay] = useState(true);
-  const shown = useMemo(() => events.slice(0, 6), [events]);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const id = window.setInterval(updateNow, 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const activeEvents = useMemo(
+    () =>
+      events.filter((e) =>
+        nowMs === null
+          ? e.status === "PUBLISHED"
+          : isUpcomingActiveEvent(e, nowMs),
+      ),
+    [events, nowMs],
+  );
+  const shown = useMemo(() => activeEvents.slice(0, 6), [activeEvents]);
 
   const slides = useMemo<HeroSlideItem[]>(() => {
-    const published = events.filter((e) => e.status === "PUBLISHED");
-    const featured = published.filter((e) => e.showInSlider);
-    const source = featured.length > 0 ? featured : published;
+    const featured = activeEvents.filter((e) => e.showInSlider);
+    const source = featured.length > 0 ? featured : activeEvents;
 
     if (source.length > 0) {
       return source.map((ev) => {
@@ -93,7 +109,7 @@ export function Home({ events, venueName, contact }: Props) {
         bookingHref: "#events",
       },
     ];
-  }, [events, venueName]);
+  }, [activeEvents, venueName]);
 
   const activeIndex = slides.length > 0 ? slide % slides.length : 0;
   const currentSlide = slides[activeIndex] ?? slides[0];
@@ -158,25 +174,6 @@ export function Home({ events, venueName, contact }: Props) {
       window.removeEventListener("hashchange", scrollToTargetSection);
     };
   }, []);
-
-  const display: EventData[] = shown.length
-    ? shown
-    : examples.map((title, index) => ({
-        id: `example-${index}`,
-        slug: "",
-        title,
-        description: "",
-        artists: [],
-        venue: venueName,
-        posterUrl: null,
-        startsAt: `2026-11-${15 + index}T19:00:00.000Z`,
-        endsAt: "",
-        saleStartsAt: "",
-        saleEndsAt: "",
-        status: "PUBLISHED",
-        version: 1,
-        minPriceSatang: 29900,
-      }));
 
   return (
     <div className="mongkol-page">
@@ -304,13 +301,25 @@ export function Home({ events, venueName, contact }: Props) {
               ดูอีเวนต์ทั้งหมด <ArrowRight size={17} />
             </Link>
           </div>
-          <div className="mongkol-event-grid">
-            {display.map((event) => (
-              <Tilt key={event.id}>
-                <EventCard event={event} />
-              </Tilt>
-            ))}
-          </div>
+          {shown.length > 0 ? (
+            <div className="mongkol-event-grid">
+              {shown.map((event) => (
+                <Tilt key={event.id}>
+                  <EventCard event={event} />
+                </Tilt>
+              ))}
+            </div>
+          ) : (
+            <div className="customer-card" style={{ textAlign: "center", padding: "40px 24px" }}>
+              <h3 style={{ marginBottom: 8 }}>ขณะนี้ยังไม่มีอีเวนต์ที่กำลังเปิดให้จอง</h3>
+              <p className="muted" style={{ marginBottom: 18 }}>
+                สามารถดูประวัติอีเวนต์ที่ผ่านมาแล้วทั้งหมดได้ที่หน้าตารางอีเวนต์
+              </p>
+              <Link href="/events" className="view-all-button">
+                ดูอีเวนต์ทั้งหมด <ArrowRight size={16} />
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

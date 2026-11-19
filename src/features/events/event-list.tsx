@@ -30,7 +30,12 @@ function TiltCard({ children }: { children: React.ReactNode }) {
 }
 
 function isPastEvent(event: EventData) {
-  return event.status === "COMPLETED" || event.status === "CLOSED";
+  const endMs = event.endsAt ? Date.parse(event.endsAt) : NaN;
+  return (
+    event.status === "COMPLETED" ||
+    event.status === "CLOSED" ||
+    (!Number.isNaN(endMs) && endMs <= Date.now())
+  );
 }
 
 export function EventList({ initialQuery = "" }: { initialQuery?: string }) {

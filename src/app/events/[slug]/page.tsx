@@ -108,7 +108,11 @@ export default async function EventPage({
           </div>
 
           <aside className="stack sticky-panel event-detail-aside">
-            <EventCountdown startsAt={event.startsAt} endsAt={event.endsAt} />
+            <EventCountdown
+              startsAt={event.startsAt}
+              endsAt={event.endsAt}
+              eventStatus={event.status}
+            />
 
             <div className="panel customer-sticky-card">
               <div className="section-kicker">
@@ -227,7 +231,11 @@ export default async function EventPage({
                   เลือกโต๊ะ / โซน <ArrowRight size={18} />
                 </Link>
               ) : (
-                <p className="notice">ขณะนี้อีเวนต์ไม่เปิดรับการจอง</p>
+                <p className="notice">
+                  {event.status === "COMPLETED"
+                    ? "อีเวนต์นี้จบแล้ว ปิดการจำหน่ายบัตรและไม่เปิดรับการจอง"
+                    : "ขณะนี้อีเวนต์ไม่เปิดรับการจอง"}
+                </p>
               )}
             </div>
           </aside>

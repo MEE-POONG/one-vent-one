@@ -4,6 +4,18 @@ import { prisma } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { attachShowInSlider } from "./event-admin";
 
+export async function syncCompletedEvents(now = new Date()) {
+  await prisma.event.updateMany({
+    where: {
+      status: { in: ["PUBLISHED", "CLOSED"] },
+      endsAt: { lte: now },
+    },
+    data: {
+      status: "COMPLETED",
+    },
+  });
+}
+
 export async function getBusinessProfile() {
   const profile = await prisma.businessProfile.findUnique({
     where: { key: "primary" },
@@ -22,6 +34,7 @@ export async function listEvents({
   page = 1,
   pageSize = 12,
 }: { q?: string; page?: number; pageSize?: number } = {}) {
+  await syncCompletedEvents();
   const where: Prisma.EventWhereInput = {
     status: { in: ["PUBLISHED", "CLOSED", "COMPLETED"] },
     ...(q
@@ -76,6 +89,7 @@ const eventInclude = {
   publishedLayoutVersion: true,
 } satisfies Prisma.EventInclude;
 export async function getEventBySlug(slug: string) {
+  await syncCompletedEvents();
   const rawEvent = await prisma.event.findUnique({
     where: { slug },
     include: eventInclude,
@@ -86,6 +100,7 @@ export async function getEventBySlug(slug: string) {
   return { ...event, layout: event.publishedLayoutVersion };
 }
 export async function getEventById(id: string) {
+  await syncCompletedEvents();
   const event = await prisma.event.findUnique({
     where: { id },
     include: eventInclude,

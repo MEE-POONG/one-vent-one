@@ -212,7 +212,8 @@ export function EventCard({ event }: { event: EventData }) {
   }).format(startsAt);
   const modes = [...new Set(event.zones?.map((zone) => zone.sellingMode))];
   const detailsHref = event.slug ? `/events/${event.slug}` : "/events";
-  const isPublished = event.status === "PUBLISHED";
+  const isEnded = event.status === "COMPLETED";
+  const canBook = event.status === "PUBLISHED";
   const artistSrc = event.artistImageUrl || "";
 
   // Write pointer CSS variables immediately so even a quick pass tilts smoothly.
@@ -325,9 +326,13 @@ export function EventCard({ event }: { event: EventData }) {
             {month} {year}
           </span>
         </time>
-        <span className={`event-card-badge ${isPublished ? "is-live" : ""}`}>
+        <span className={`event-card-badge ${canBook ? "is-live" : ""}`}>
           <span className="event-card-badge-dot" aria-hidden="true" />
-          {isPublished ? "เปิดขายบัตร" : statusText(event.status)}
+          {isEnded
+            ? "อีเวนต์จบแล้ว"
+            : canBook
+              ? "เปิดขายบัตร"
+              : statusText(event.status)}
         </span>
       </Link>
       <span
@@ -365,12 +370,12 @@ export function EventCard({ event }: { event: EventData }) {
           </div>
           <Link
             href={
-              isPublished && event.slug ? `${detailsHref}/booking` : detailsHref
+              canBook && event.slug ? `${detailsHref}/booking` : detailsHref
             }
             className="event-card-cta"
-            aria-label={`${isPublished ? "จองบัตร" : "ดูรายละเอียด"} ${event.title}`}
+            aria-label={`${canBook ? "จองบัตร" : "ดูรายละเอียด"} ${event.title}`}
           >
-            {isPublished ? "จองบัตร" : "รายละเอียด"}
+            {canBook ? "จองบัตร" : "ดูรายละเอียด"}
             <ArrowRight size={17} aria-hidden="true" />
           </Link>
         </div>

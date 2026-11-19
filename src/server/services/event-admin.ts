@@ -110,6 +110,14 @@ export async function setEventShowInSlider(
 }
 
 export async function adminEvent(id: string) {
+  await prisma.event.updateMany({
+    where: {
+      id,
+      status: { in: ["PUBLISHED", "CLOSED"] },
+      endsAt: { lte: new Date() },
+    },
+    data: { status: "COMPLETED" },
+  });
   const rawEvent = await prisma.event.findUnique({
     where: { id },
     include: {
@@ -179,6 +187,13 @@ export async function listAdminEvents(
   checkInOnly = false,
 ) {
   const now = new Date();
+  await prisma.event.updateMany({
+    where: {
+      status: { in: ["PUBLISHED", "CLOSED"] },
+      endsAt: { lte: now },
+    },
+    data: { status: "COMPLETED" },
+  });
   const where: Prisma.EventWhereInput = {
     ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
     ...(status ? { status } : {}),
